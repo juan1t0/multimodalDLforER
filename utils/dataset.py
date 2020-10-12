@@ -100,16 +100,16 @@ class Emotic_PP(Dataset):
 		if torch.is_tensor(idx):
 			 idx = idx.tolist()
 		
-		img_folder = self.RootDir +'/'+ self.Annotations.iloc[idx,1]
+		img_folder = self.RootDir +'/'+ self.Annotations.iloc[idx,1] +'/'
 		img_file = self.Annotations.iloc[idx,2]
 		img = cv2.imread(img_folder + img_file)
 
-		person_folder = (self.RootDir +'/'+ self.Annotations.iloc[idx,1]).replace('images','persons')
+		person_folder = (self.RootDir +'/'+ self.Annotations.iloc[idx,1]).replace('images','persons') +'/'
 		person_file = self.Mode + '_person_'+str(idx)+'.jpg'
 		person = cv2.imread(person_folder + person_file)
 		
-		label = self.Annotations.iloc[idx,4]
-		bbox = self.Annotations.iloc[idx,3]
+		label = self.Annotations.iloc[idx,5]
+		bbox = self.Annotations.iloc[idx,4]
 
 		sample = {'label': label,
 							'imagen': img,

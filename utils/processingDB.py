@@ -5,26 +5,21 @@ import json
 import os
 from os.path import exists
 
-"""
-	revisar el extractor de pose, debe retornar joints y bones
-"""
-
 directed_edges =[(0,1),(0,15),(0,16),(1,2),(1,5),
     (1,8),(2,3),(3,4),(5,6),(6,7),
     (8,9),(8,12),(9,10),(10,11),(12,13),
     (13,14),(15,17),(16,18),(14,21),(14,19),
     (19,20),(11,24),(11,22),(22,23),(1,1)]
 
-def get_skeleton_pose(img, img_folder, img_filename, temp_folder, colab=True):
+def get_skeleton_pose(img_folder, img_filename, temp_folder, neutral, colab=True):
 	'''
-	img = image
 	img_folder : Folder where images are placed
 	img_filename : name of the image
-	img_idx : images' index #### del
-	temp_folder : Folder to save the result
+	temp_folder : Folder to save the result temporaly
+	neutral : skeletal data to use in case of error or not clear posture
 	colab : true if running on colaboratory
 
-	return the numpy array with the skeleton
+	return the numpy arrays with the joints and bones data
 	'''
 	if colab: 
 		if not exists(temp_folder):
@@ -35,15 +30,18 @@ def get_skeleton_pose(img, img_folder, img_filename, temp_folder, colab=True):
 
 		state = os.system('cd openpose && ./build/examples/openpose/openpose.bin '+ imgpath + imgsave + ' --display 0 --render_pose 0')
 		if state != 0:
-				C, T, V, N = 3, 1, 25, 1 #chanels, frame, joints, persons
-				return np.zeros((C, T, V, N))
+			data = []
+		else:
+			sample_name = img_filename[:-4] + '_000000000000_keypoints.json'
+			sample_path = os.path.join('./temp', sample_name)
+			with open(sample_path, 'r') as f:
+				skln = json.load(f)
+			data = skln['people']
 
-		sample_name = img_filename[:-4] + '_000000000000_keypoints.json'
-		sample_path = os.path.join('./temp', sample_name)
-
-		with open(sample_path, 'r') as f:
-			skln = json.load(f)
-		data = skln['people']
+		if len(data) == 0:
+			with open(neutral, 'r') as f:
+				skln = json.load(f)
+			data = skln['people']
 
 		C, T, V, N = 3, 1, 25, 1 #chanels, frame, joints, persons
 
@@ -57,22 +55,31 @@ def get_skeleton_pose(img, img_folder, img_filename, temp_folder, colab=True):
 		for v1,v2 in directed_edges:
 			data_np_bone[:,:,v1,:] = data_np_joint[:,:,v1,:] - data_np_joint[:,:,v2,:]
 
-		rmfn = temp_folder + '/' + sample_name
-		os.system('rm ' + rmfn)
+		try:
+			rmfn = temp_folder + '/' + sample_name
+			os.system('rm ' + rmfn)
+		except:
+			pass
 		return data_np_joint, data_np_bone
 	else:
 		return 0
 
-def get_face_landmarks(img, model=None, npoints=68):
+def get_face_landmarks(img, neutral, model=None, npoints=68):
 	'''
 	img : image as numpy array
-	flmodel : the model for obtain the landmarks
+	neutral : data to return in case of error or not clear face
+	model : the model for obtain the landmarks
 	npoints : the number of landmarks to detect, 68 by default
+	
 	return a 1D numpy array with the landmarks
 	'''
-	face = model.get_landmarks(img)
+	try:
+		face = model.get_landmarks(img)
+	except:
+		return neutral
+
 	if face == None:
-		return np.ones(npoints*2)
+		return neutral
 
 	face = face[0]
 	flm = np.zeros(npoints*2)
@@ -86,7 +93,9 @@ def get_context(img, bbox, mode='blank', finalW=224, finalH=224):
 	'''
 	img : numpy array
 	bbox : can be a str with the bbox, format '[y1,x1,y2,x2]' or the actually bbox
+	mode : way to resalt context/environment of image
 	finalW & finalH : final dimension
+
 	return img with zeros intead of bbox
 	'''
 	if type(bbox) == str:
@@ -103,20 +112,20 @@ def get_context(img, bbox, mode='blank', finalW=224, finalH=224):
 	if mode == 'blank':
 		cm[x1:x2,y1:y2,:] = np.zeros((x2-x1, y2-y1, 3))
 	elif mode == 'blur':
-		blr = cv2.GaussianBlur(cm, (21, 21), 0)
+		blr = cv2.GaussianBlur(cm, (29, 29), 0)
 		condition = np.ones(cm.shape)
 		condition[x1:x2,y1:y2,:] = np.zeros((x2-x1, y2-y1, 3))
-		cm = np.where(condition,cm,blr)
+		cm = np.where(condition, cm, blr)
 	else:
 		raise ValueError('No mode')
 
 	cm = cv2.resize(cm, (finalW, finalH))
 	return cm
 
-def gen_emotic_mdb_skl(EmoticDataset, root_dir, annotation_dir, colab=True):
+def gen_emotic_mdb_skl(EmoticDataset, root_dir, annotation_dir, neutral, colab=True):
 	mode = EmoticDataset.Mode
 	save_dir = root_dir +'/'+ mode +'/posture/'
-	annotation_dir = root_dir + '/'+ annotation_dir +'/'+ mode +'/'
+	annotation_dir = root_dir +  annotation_dir +'/'+ mode +'/'
 
 	save_Jdir = save_dir +'joints/'
 	save_Bdir = save_dir +'bones/'
@@ -125,7 +134,7 @@ def gen_emotic_mdb_skl(EmoticDataset, root_dir, annotation_dir, colab=True):
 		csv_file = csv.writer(file, delimiter=',')
 		row = ['File_Joint_Name', 'Folder_Joint_Path',
 					 'File_Bone_Name', 'Folder_Bone_Path',
-					 'Label', 'Original_image', 'Process_image']
+					 'Label', 'Original_image', 'Original_folder', 'Process_image']
 		csv_file.writerow(row)
 	
 		if colab:
@@ -133,46 +142,51 @@ def gen_emotic_mdb_skl(EmoticDataset, root_dir, annotation_dir, colab=True):
 				imgFolder = elem['folder'].replace('images', 'persons')
 				imgFile = elem['person_filename']
 
-				skl_join, skl_bone = get_skeleton_pose(img_folder=imgFolder, img_filename=imgFile, temp_folder='/content/temp')
-				
 				imgJFile = 'skl_join_'+ str(i) +'.npy'
-				np.save(save_Jdir + imgJFile, skl_join)
-
 				imgBFile = 'skl_bone_'+ str(i) +'.npy'
-				np.save(save_Bdir + imgBFile, skl_bone)
+				if not exists(save_Jdir + imgJFile):
+					skl_join, skl_bone = get_skeleton_pose(img_folder=imgFolder,
+																								 img_filename=imgFile,
+																								 temp_folder='/content/temp',
+																								 neutral=neutral)
+					np.save(save_Jdir + imgJFile, skl_join)
+					np.save(save_Bdir + imgBFile, skl_bone)
 				
 				row = [imgJFile, save_Jdir,
 							 imgBFile , save_Bdir,
-							 elem['label'], elem['image_filename'], elem['person_filename']]
+							 elem['label'], elem['image_filename'],
+							 elem['folder'], elem['person_filename']]
 				csv_file.writerow(row)
 				
 				if (i+1) % 2000 == 0:
-					print(i, 'images processed')
+					print(i+1, 'images processed')
 		else:
 			raise ValueError('Not yet')
 
-def gen_emotic_mdb_flm(EmoticDataset, root_dir, annotation_dir, model=None):
+def gen_emotic_mdb_flm(EmoticDataset, root_dir, annotation_dir, neutral, model=None):
 	mode = EmoticDataset.Mode
 	save_dir = root_dir + '/' + mode +'/face_landmarks/'
-	annotation_dir = root_dir +'/'+ annotation_dir +'/'+ mode +'/'
+	annotation_dir = root_dir + annotation_dir +'/'+ mode +'/'
 
 	with open(annotation_dir+'face_landmarks.csv', 'w') as file:
 		csv_file = csv.writer(file, delimiter=',')
 		row = ['File_Name', 'Folder_Path', 'Label',
-					 'Original_image', 'Process_image']
+					 'Original_image', 'Original_folder','Process_image']
 		csv_file.writerow(row)
 		for i, elem in enumerate(EmoticDataset):
-			flm = get_face_landmarks(elem['person'], model=model)
-
 			imgFile = 'flm_'+ str(i) +'.npy'
-			np.save(save_dir + imgFile, flm)
+			if not exists(save_dir + imgFile):
+				flm = get_face_landmarks(elem['person'],
+																 neutral=neutral,
+																 model=model)
+				np.save(save_dir + imgFile, flm)
 			
 			row = [imgFile, save_dir, elem['label'],
-						 elem['image_filename'], elem['person_filename']]
+						 elem['image_filename'], elem['folder'], elem['person_filename']]
 			csv_file.writerow(row)
 
 			if (i+1) % 2000 == 0:
-				print(i, 'images processed')
+				print(i+1, 'images processed')
 
 def gen_emotic_mdb_ctx(EmoticDataset, root_dir, annotation_dir, mode='blank'):
 	set_mode = EmoticDataset.Mode
@@ -182,19 +196,20 @@ def gen_emotic_mdb_ctx(EmoticDataset, root_dir, annotation_dir, mode='blank'):
 	with open(annotation_dir+'context_'+ mode + '.csv', 'w') as file:
 		csv_file = csv.writer(file, delimiter=',')
 		row = ['File_Name', 'Folder_Path', 'Label',
-					 'Original_image']
+					 'Original_image', 'Original_folder']
 		csv_file.writerow(row)
 		for i, elem in enumerate(EmoticDataset):
-			ctx = get_context(img=elem['imagen'], bbox=elem['bounding_box'], mode=mode)
 			imgFile = 'ctx_'+ str(i) +'.npy'
-			np.save(save_dir + imgFile, ctx)
+			if not exists(save_dir + imgFile):
+				ctx = get_context(img=elem['imagen'], bbox=elem['bounding_box'], mode=mode)
+				np.save(save_dir + imgFile, ctx)
 
 			row = [imgFile, save_dir, elem['label'], 
-						 elem['image_filename']]
+						 elem['image_filename'], elem['folder']]
 			csv_file.writerow(row)
 
 			if (i+1) % 2000 == 0:
-				print(i, 'images processed')
+				print(i+1, 'images processed')
 
 def gen_emotic_mdb_all(EmoticDataset, annotationDestDir, mode='blank', colab=true):
     # create csv
