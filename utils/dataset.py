@@ -31,9 +31,10 @@ class Emotic_MDB(Dataset):
 
 	def loadData(self):
 		annlist = os.listdir(self.AnnotationsDir)
-		la = []
+		la = {}
 		for nm in annlist:
-			la.append(pd.read_csv(self.AnnotationsDir + '/'+nm))
+			k = nm[:-4]
+			la[k]= pd.read_csv(self.AnnotationsDir + '/'+nm)
 		self.Annotations = la
 		md = []
 		for nm in self.ModalsNames:
@@ -47,20 +48,20 @@ class Emotic_MDB(Dataset):
 		if torch.is_tensor(idx):
 			 idx = idx.tolist()
     
-		flm_dir = self.ModalsDirs[0] + self.Annotations[0].iloc[idx, 1] + self.Annotations[0].iloc[idx, 0]
-		sklj_dir = self.ModalsDirs[1] + self.Annotations[1].iloc[idx, 1] + self.Annotations[1].iloc[idx, 0]
-		sklb_dir = self.ModalsDirs[1] + self.Annotations[1].iloc[idx, 3] + self.Annotations[1].iloc[idx, 2]
-		ctx_dir = self.ModalsDirs[2] + self.Annotations[2].iloc[idx, 1] + self.Annotations[2].iloc[idx, 0]
+		flm_dir = self.Annotations['face_landmarks'].iloc[idx, 1] + self.Annotations['face_landmarks'].iloc[idx, 0]
+		sklj_dir = self.Annotations['skeleton'].iloc[idx, 1] + self.Annotations['skeleton'].iloc[idx, 0]
+		sklb_dir = self.Annotations['skeleton'].iloc[idx, 3] + self.Annotations['skeleton'].iloc[idx, 2]
+		ctx_dir = self.Annotations['context_blur'].iloc[idx, 1] + self.Annotations['context_blur'].iloc[idx, 0]
 
 		flm = np.load(flm_dir)
 		skl_j = np.load(sklj_dir)
 		skl_b = np.load(sklb_dir)
 		ctx = np.load(ctx_dir)
 		
-		lbl = self.getlabel(self.Annotations[0].iloc[idx,2])
+		lbl = self.getlabel(self.Annotations['context_blur'].iloc[idx,2])
 
 		sample = {'label': lbl,
-			'face_landmarks': flm,
+			'face_landmarks': flm[:,None],
 			'skeleton_joints': skl_j,
 			'skeleton_bones': skl_b,
 			'context': ctx}
