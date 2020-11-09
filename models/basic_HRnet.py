@@ -67,9 +67,6 @@ class SimpleHRNet:
 		self.multiperson = multiperson
 		self.return_bounding_boxes = return_bounding_boxes
 		self.max_batch_size = max_batch_size
-		self.yolo_model_def = yolo_model_def
-		self.yolo_class_path = yolo_class_path
-		self.yolo_weights_path = yolo_weights_path
 		self.device = device
 
 		if model_name in ('HRNet', 'hrnet'):
