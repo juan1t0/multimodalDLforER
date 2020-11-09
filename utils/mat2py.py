@@ -172,22 +172,42 @@ def cat_to_one_hot(y_cat):
     one_hot_cat[cat2ind[em]] = 1
   return one_hot_cat
 
-directed_edges =[(0,1),(0,15),(0,16),(1,2),(1,5),
-                 (1,8),(2,3),(3,4),(5,6),(6,7),
-                 (8,9),(8,12),(9,10),(10,11),(12,13),
-                 (13,14),(15,17),(16,18),(14,21),(14,19),
-                 (19,20),(11,24),(11,22),(22,23),(1,1)]
+# directed_edges =[(0,1),(0,15),(0,16),(1,2),(1,5),
+#                  (1,8),(2,3),(3,4),(5,6),(6,7),
+#                  (8,9),(8,12),(9,10),(10,11),(12,13),
+#                  (13,14),(15,17),(16,18),(14,21),(14,19),
+#                  (19,20),(11,24),(11,22),(22,23),(1,1)]
+
+directed_edges = [(1, 3), (3, 5), (2, 4), (4, 6),
+                  (7, 9), (9, 11), (8, 10), (10, 12),
+                  (13, 0), (13, 1), (13, 2), (13, 14),
+                  (14, 8), (14, 7), (13, 13)]
 
 def get_skeleton_data(keypoints):
-  pose = keypoints
+  fail = 0
+  for kp in keypoints:
+    if kp[2] <=0.4:
+      fail +=1
+  if fail > 10:
+    return 0, 0
 
-  C, T, V, N = 3, 1, 25, 1 #chanels, frame, joints, persons
+  p17 = [(keypoints[5] + keypoints[6]) / 2.0]
+  p18 = [(keypoints[11] + keypoints[12]) / 2.0]
+  pose = []
+  for i,kp in enumerate(keypoints):
+    if i > 0 and i < 5:
+      continue
+    pose.append(kp)
+  pose.append(p17)
+  pose.append(p18)
+
+  C, T, V, N = 3, 1, 15, 1 #chanels, frame, joints, persons
   data_np_joint = np.zeros((C, T, V, N))
   data_np_bone = np.zeros((C, T, V, N))
 
-  data_np_joint[0, 0, :, 0] = pose[0::3]
-  data_np_joint[1, 0, :, 0] = pose[1::3]
-  data_np_joint[2, 0, :, 0] = pose[2::3]
+  data_np_joint[0, 0, :, 0] = pose[:,0]
+  data_np_joint[1, 0, :, 0] = pose[:,1]
+  data_np_joint[2, 0, :, 0] = pose[:,2]
 
   for v1,v2 in directed_edges:
     data_np_bone[:,:,v1,:] = data_np_joint[:,:,v1,:] - data_np_joint[:,:,v2,:]
@@ -195,7 +215,7 @@ def get_skeleton_data(keypoints):
   return data_np_joint, data_np_bone
 
 def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
-                 fa_model=None, vectordatum=None, opmodel=None, generate_npy=False, debug_mode=False):
+                 fa_model=None, pose_model=None, generate_npy=False, debug_mode=False):
   '''
   Prepare csv files and save preprocessed data in npy files. 
     data_mat: Mat data object for a label
@@ -203,14 +223,12 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
     save_dirs: dict with the folders to save
     dataset_type: Type of the dataset (train, val or test)
     fa_model: Model for recognise the faces
-    vectordatum: Openpose object, used for get keypoints
-    opmodel: Openpose model for get the keypoints
+    pose_model: High resolution  model for get the keypoints
     generate_npy: If True the data is preprocessed and saved in npy files
     debug_mode: If True just the first example is procesed
   '''
   data_set = list()
 
-  opmodel.start()
   to_break = 0
   path_not_exist = 0
   cat_cont_zero = 0
@@ -229,25 +247,23 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
           print ('path not existing', ex_idx, image_path)
           continue
         else:
-          datum = opmodel.Datum()
-
           context = cv2.cvtColor(cv2.imread(image_path),cv2.COLOR_BGR2RGB)
-          body = context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]].copy()
-          
-          datum.cvInputData = body
-          opmodel.emplaceAndPop(vectordatum([datum]))
-          pose = datum.poseKeypoints
+          body = context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]].copy() 
+          pose = pose_model.predict(body)
 
           fbbox, _ = fa_model.detect(body, threshold=0.5, scale=1.0)
-          face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
-
+          if len(fbbox) != 0:
+            fbbox = np.round(fbbox[0]).astype('int32')
+            face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
+          else:
+            face = None
           context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]] = np.zeros(body.shape)
           body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]] = np.zeros(face.shape)
           
           cntx_cv = cv2.resize(context, (224,224))
           body_cv = cv2.resize(body, (128,128))
-          face_cv = cv2.resize(face, (64,64))
-          join_cv, bone_cv = get_skeleton_data(pose)
+          face_cv = cv2.resize(face, (64,64)) if face!=None else 0
+          join_cv, bone_cv = get_skeleton_data(pose[0])
       except Exception as e:
         to_break += 1
         if debug_mode == True:
@@ -259,22 +275,30 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
       
       if generate_npy == True:
         nid = str(ex_idx).zfill(6)
-        np.save(os.path.join(save_dirs['root'],dataset_type,save_dirs['cf'],'cntx_'+ nid +'.npy'),
-                cntx_cv)
-        np.save(os.path.join(save_dirs['root'],dataset_type,save_dirs['pf'],'body_'+ nid +'.npy'),
-                body_cv)
-        np.save(os.path.join(save_dirs['root'],dataset_type,save_dirs['ff'],'face_'+ nid +'.npy'),
-                face_cv)
-        np.save(os.path.join(save_dirs['root'],dataset_type,save_dirs['jf'],'joit_'+ nid +'.npy'),
-                join_cv)
-        np.save(os.path.join(save_dirs['root'],dataset_type,save_dirs['bf'],'bone_'+ nid +'.npy'),
-                bone_cv)
+        ctxfolder, ctxfile = os.path.join(dataset_type, save_dirs['cf']), 'cntx_'+ nid +'.npy'
+        bodfolder, bodfile = os.path.join(dataset_type, save_dirs['pf']), 'body_'+ nid +'.npy'
+        facfolder, facfile = os.path.join(dataset_type, save_dirs['ff']), 'face_'+ nid +'.npy'
+        joifolder, joifile = os.path.join(dataset_type, save_dirs['jf']), 'joit_'+ nid +'.npy'
+        bonfolder, bonfile = os.path.join(dataset_type, save_dirs['bf']), 'bone_'+ nid +'.npy'
 
-        et.set_fields([os.path.join(dataset_type,save_dirs['cf']),'cntx_'+ nid +'.npy', 
-                       os.path.join(dataset_type,save_dirs['pf']),'body_'+ nid +'.npy',
-                       os.path.join(dataset_type,save_dirs['ff']),'face_'+ nid +'.npy',
-                       os.path.join(dataset_type,save_dirs['jf']),'joit_'+ nid +'.npy',
-                       os.path.join(dataset_type,save_dirs['bf']),'bone_'+ nid +'.npy'])
+        np.save(os.path.join(save_dirs['root'], ctxfolder, ctxfile), cntx_cv)
+        np.save(os.path.join(save_dirs['root'], bodfolder, bodfile), body_cv)
+        if face_cv != 0:
+          np.save(os.path.join(save_dirs['root'], facfolder, facfile), face_cv)
+        else:
+          facfolder, facfile = '', ''
+        if join_cv != 0:
+          np.save(os.path.join(save_dirs['root'], joifolder, joifile), join_cv)
+          np.save(os.path.join(save_dirs['root'], bonfolder, bonfile), bone_cv)
+        else:
+          joifolder, joifile = '', ''
+          bonfolder, bonfile = '', ''
+
+        et.set_fields([ctxfolder, ctxfile,
+                       bodfolder, bodfile,
+                       facfolder, facfile,
+                       joifolder, joifile,
+                       bonfolder, bonfile])
 
       data_set.append(et)
       if idx % 1000 == 0 and debug_mode==False:
