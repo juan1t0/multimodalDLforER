@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-import torch.utils.model_zoo as model_zoo
+# import torch.utils.model_zoo as model_zoo
 
+from torchvision.models.utils import load_state_dict_from_url
 from torchvision.models import vgg19
 
 cfg = {
@@ -52,16 +53,22 @@ class ShortVGG(nn.Module):
 		return nn.Sequential(*layers)
 	
 	def load_pretrain(self):
-		state_dict = torch.load(model_zoo.load_url(model_urls[self.name]))
-		#model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
+		state_dict = load_state_dict_from_url(model_urls[self.name])
 		currstate = self.state_dict()
+		m = 0
 		for name, param in state_dict.items():
 			if name not in currstate:
 				continue
-			if isinstance(param, torch.Parameter):
+			if isinstance(param, torch.nn.parameter.Parameter):
 				# backwards compatibility for serialized parameters
 				param = param.data
-			currstate[name].copy_(param)
+			try:
+				currstate[name].copy_(param)
+				m += 1
+			except:
+				print('missing', name)
+				pass
+		print(m,'modules loaded')
 
 def getTorchVGG(numclasses, pretrained=False):
 	model = vgg19(pretrained)
