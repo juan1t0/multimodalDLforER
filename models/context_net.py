@@ -202,6 +202,7 @@ def resnet18(pretrained=False, num_classes=1000):
 				param = param.data
 			try:
 				currstate[name].copy_(param)
+				currstate[name].requires_grad = False
 				m += 1
 			except:
 				print('missing', name)
@@ -234,6 +235,7 @@ def resnet50(pretrained=False, num_classes=1000):
 				param = param.data
 			try:
 				currstate[name].copy_(param)
+				currstate[name].requires_grad = False
 				m += 1
 			except:
 				print('missing',name)

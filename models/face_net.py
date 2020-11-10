@@ -64,6 +64,7 @@ class ShortVGG(nn.Module):
 				param = param.data
 			try:
 				currstate[name].copy_(param)
+				currstate[name].requires_grad = False
 				m += 1
 			except:
 				print('missing', name)
@@ -72,6 +73,8 @@ class ShortVGG(nn.Module):
 
 def getTorchVGG(numclasses, pretrained=False):
 	model = vgg19(pretrained)
+	for param in model.parameters():
+		param.requires_grad = False
 	model.classifier = nn.Sequential(nn.Linear(512 * 7 * 7, 4096),
 																	 nn.ReLU(True),
 																	 nn.Dropout(),
