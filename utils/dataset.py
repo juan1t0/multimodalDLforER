@@ -11,6 +11,7 @@ from torch.utils.data import Dataset#, DataLoader
 '''
 
 def draw_points(image, points, color_palette='tab20', palette_samples=16):
+	import matplotlib.pyplot as plt
 	try:
 		colors = np.round(np.array(plt.get_cmap(color_palette).colors) * 255
 											).astype(np.uint8)[:, ::-1].tolist()

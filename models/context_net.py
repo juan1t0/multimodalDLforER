@@ -50,35 +50,36 @@ class BasicBlock(nn.Module):
 		out = self.relu(out)
 		return out
 
-# class Bottleneck(nn.Module):
-#     expansion = 4
-#     def __init__(self, inplanes, planes, stride=1, downsample=None):
-#         super(Bottleneck, self).__init__()
-#         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-#         self.bn1 = nn.BatchNorm2d(planes)
-#         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-#                                padding=1, bias=False)
-#         self.bn2 = nn.BatchNorm2d(planes)
-#         self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
-#         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
-#         self.relu = nn.ReLU(inplace=True)
-#         self.downsample = downsample
-#         self.stride = stride
-#     def forward(self, x):
-#         residual = x
-#         out = self.conv1(x)
-#         out = self.bn1(out)
-#         out = self.relu(out)
-#         out = self.conv2(out)
-#         out = self.bn2(out)
-#         out = self.relu(out)
-#         out = self.conv3(out)
-#         out = self.bn3(out)
-#         if self.downsample is not None:
-#             residual = self.downsample(x)
-#         out += residual
-#         out = self.relu(out)
-#         return out
+class Bottleneck(nn.Module):
+	expansion = 4
+	def __init__(self, inplanes, planes, stride=1, downsample=None):
+		super(Bottleneck, self).__init__()
+		self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
+		self.bn1 = nn.BatchNorm2d(planes)
+		self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
+													 padding=1, bias=False)
+		self.bn2 = nn.BatchNorm2d(planes)
+		self.conv3 = nn.Conv2d(planes, planes * self.expansion, kernel_size=1, bias=False)
+		self.bn3 = nn.BatchNorm2d(planes * self.expansion)
+		self.relu = nn.ReLU(inplace=True)
+		self.downsample = downsample
+		self.stride = stride
+	
+	def forward(self, x):
+		residual = x
+		out = self.conv1(x)
+		out = self.bn1(out)
+		out = self.relu(out)
+		out = self.conv2(out)
+		out = self.bn2(out)
+		out = self.relu(out)
+		out = self.conv3(out)
+		out = self.bn3(out)
+		if self.downsample is not None:
+			residual = self.downsample(x)
+		out += residual
+		out = self.relu(out)
+		return out
 
 class ResNet(nn.Module):
 	def __init__(self, block, layers, num_classes=1000):
@@ -174,15 +175,10 @@ class ResNet(nn.Module):
 		return ax, rx, [self.att, fe, per]
 
 def resnet18(pretrained=False, num_classes=1000):
-	"""Constructs a ResNet-18 model.
-	Args:
-			pretrained (bool): If True, returns a model pre-trained on ImageNet
-	"""
 	model = ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
 	if pretrained:
 		state_dict = torch.load(model_zoo.load_url(model_urls['resnet18']))
 		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
-
 		currstate = model.state_dict()
 		for name, param in state_dict.items():
 			if name not in currstate:
@@ -202,15 +198,22 @@ def resnet18(pretrained=False, num_classes=1000):
 #     if pretrained:
 #         model.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
 #     return model
-# def resnet50(pretrained=False, **kwargs):
-#     """Constructs a ResNet-50 model.
-#     Args:
-#         pretrained (bool): If True, returns a model pre-trained on ImageNet
-#     """
-#     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
-#     if pretrained:
-#         model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
-#     return model
+
+def resnet50(pretrained=False, num_classes=1000):
+	model = ResNet(Bottleneck, [3, 4, 6, 3], num_classes)
+	if pretrained:
+		state_dict = torch.load(model_zoo.load_url(model_urls['resnet50']))
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
+		currstate = model.state_dict()
+		for name, param in state_dict.items():
+			if name not in currstate:
+				continue
+			if isinstance(param, torch.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			currstate[name].copy_(param)
+	return model
+
 # def resnet101(pretrained=False, **kwargs):
 #     """Constructs a ResNet-101 model.
 #     Args:

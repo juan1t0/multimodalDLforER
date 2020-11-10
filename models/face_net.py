@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+import torch.utils.model_zoo as model_zoo
 
 from torchvision.models import vgg19
 
@@ -12,11 +13,21 @@ cfg = {
 	'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
 
+model_urls = {
+	'VGG11': 'https://download.pytorch.org/models/vgg11-bbd30ac9.pth',
+	'VGG13': 'https://download.pytorch.org/models/vgg13-c768596a.pth',
+	'VGG16': 'https://download.pytorch.org/models/vgg16-397923af.pth',
+	'VGG19': 'https://download.pytorch.org/models/vgg19-dcbb9e9d.pth',
+}
+
 class ShortVGG(nn.Module):
-	def __init__(self, vgg_name, numclasses):
+	def __init__(self, vgg_name, numclasses, pretrain=False):
 		super(ShortVGG, self).__init__()
-		self.features = self._make_layers(cfg[vgg_name])
+		self.name = vgg_name
+		self.features = self._make_layers(cfg[self.vgg_name])
 		self.classifier = nn.Linear(512, numclasses)
+		if pretrain:
+			load_pretrain()
 
 	def forward(self, x):
 		out = self.features(x)
@@ -39,6 +50,18 @@ class ShortVGG(nn.Module):
 		
 		layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
 		return nn.Sequential(*layers)
+	
+	def load_pretrain(self):
+		state_dict = torch.load(model_zoo.load_url(model_urls[self.name]))
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
+		currstate = self.state_dict()
+		for name, param in state_dict.items():
+			if name not in currstate:
+				continue
+			if isinstance(param, torch.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			currstate[name].copy_(param)
 
 def getTorchVGG(numclasses, pretrained=False):
 	model = vgg19(pretrained)
