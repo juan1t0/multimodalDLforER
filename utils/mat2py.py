@@ -1,4 +1,3 @@
-import argparse 
 import csv 
 import cv2
 import numpy as np 
@@ -188,11 +187,11 @@ def get_skeleton_data(keypoints):
   for kp in keypoints:
     if kp[2] <=0.4:
       fail +=1
-  if fail > 10:
-    return 0, 0
-
-  p17 = [(keypoints[5] + keypoints[6]) / 2.0]
-  p18 = [(keypoints[11] + keypoints[12]) / 2.0]
+  if fail > 13:
+    return None, None
+  
+  p17 = (keypoints[5] + keypoints[6]) / 2.0
+  p18 = (keypoints[11] + keypoints[12]) / 2.0
   pose = []
   for i,kp in enumerate(keypoints):
     if i > 0 and i < 5:
@@ -200,6 +199,7 @@ def get_skeleton_data(keypoints):
     pose.append(kp)
   pose.append(p17)
   pose.append(p18)
+  pose = np.asarray(pose)
 
   C, T, V, N = 3, 1, 15, 1 #chanels, frame, joints, persons
   data_np_joint = np.zeros((C, T, V, N))
@@ -216,23 +216,23 @@ def get_skeleton_data(keypoints):
 
 def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
                  fa_model=None, pose_model=None, generate_npy=False, debug_mode=False):
-  '''
-  Prepare csv files and save preprocessed data in npy files. 
-    data_mat: Mat data object for a label
-    data_path_src: Path of the parent directory containing the emotic images folders
-    save_dirs: dict with the folders to save
-    dataset_type: Type of the dataset (train, val or test)
-    fa_model: Model for recognise the faces
-    pose_model: High resolution  model for get the keypoints
-    generate_npy: If True the data is preprocessed and saved in npy files
-    debug_mode: If True just the first example is procesed
-  '''
-  data_set = list()
+
+  csv_path = os.path.join(save_dirs['root'],save_dirs['annotation'], "%s.csv" %(dataset_type))
+  csvfile = open(csv_path, 'w')
+  filewriter = csv.writer(csvfile, delimiter=',', dialect='excel')
+  row = ['Categorical_Labels', 'Continuous_Labels',
+          'ContextFolder','ContextFile',
+          'BodyFolder','BodyFile',
+          'FaceFolder','FaceFile',
+          'JointFolder','JointFile',
+          'BoneFolder','BoneFile']
+  filewriter.writerow(row)
 
   to_break = 0
   path_not_exist = 0
   cat_cont_zero = 0
-  idx = 0
+  idx = -1
+
   for ex_idx, ex in enumerate(data_mat[0]):
     nop = len(ex[4][0])
     for person in range(nop):
@@ -240,6 +240,7 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
         et = emotic_train(ex[0][0],ex[1][0],ex[2],ex[4][0][person])
       else:
         et = emotic_test(ex[0][0],ex[1][0],ex[2],ex[4][0][person])
+      idx = idx + 1
       try:
         image_path = os.path.join(data_path_src,et.folder,et.filename)
         if not os.path.exists(image_path):
@@ -248,33 +249,33 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
           continue
         else:
           context = cv2.cvtColor(cv2.imread(image_path),cv2.COLOR_BGR2RGB)
-          body = context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]].copy() 
-          pose = pose_model.predict(body)
-
-          fbbox, _ = fa_model.detect(body, threshold=0.5, scale=1.0)
-          if len(fbbox) != 0:
-            fbbox = np.round(fbbox[0]).astype('int32')
-            face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
-          else:
-            face = None
-          context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]] = np.zeros(body.shape)
-          body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]] = np.zeros(face.shape)
-          
+          body = context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]].copy()
+          cn = body.shape
+          if pose_model is not None:
+            pose = pose_model.predict(body)
+          if fa_model is not None:
+            body = cv2.resize(body,(256,256))
+            fbbox, _ = fa_model.detect(body,threshold=0.5, scale=1.0)
+            if len(fbbox) != 0:
+              fbbox = np.round(fbbox[0]).astype('int32')
+              face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
+              face_cv = cv2.resize(face, (64,64))
+              body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]] = np.zeros(face.shape)
+            else:
+              face_cv = None
+          context[et.bbox[1]:et.bbox[3],et.bbox[0]:et.bbox[2]] = np.zeros(cn)          
           cntx_cv = cv2.resize(context, (224,224))
           body_cv = cv2.resize(body, (128,128))
-          face_cv = cv2.resize(face, (64,64)) if face!=None else 0
           join_cv, bone_cv = get_skeleton_data(pose[0])
       except Exception as e:
         to_break += 1
-        if debug_mode == True:
-            print ('breaking at idx=%d, %d due to exception=%r' %(ex_idx, idx, e))
         continue
       if (et.cat_annotators == 0 or et.cont_annotators == 0):
         cat_cont_zero += 1
         continue
       
       if generate_npy == True:
-        nid = str(ex_idx).zfill(6)
+        nid = str(idx).zfill(6)
         ctxfolder, ctxfile = os.path.join(dataset_type, save_dirs['cf']), 'cntx_'+ nid +'.npy'
         bodfolder, bodfile = os.path.join(dataset_type, save_dirs['pf']), 'body_'+ nid +'.npy'
         facfolder, facfile = os.path.join(dataset_type, save_dirs['ff']), 'face_'+ nid +'.npy'
@@ -283,64 +284,41 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
 
         np.save(os.path.join(save_dirs['root'], ctxfolder, ctxfile), cntx_cv)
         np.save(os.path.join(save_dirs['root'], bodfolder, bodfile), body_cv)
-        if face_cv != 0:
+        if face_cv is not None:
           np.save(os.path.join(save_dirs['root'], facfolder, facfile), face_cv)
         else:
           facfolder, facfile = '', ''
-        if join_cv != 0:
+        if join_cv is not None:
           np.save(os.path.join(save_dirs['root'], joifolder, joifile), join_cv)
           np.save(os.path.join(save_dirs['root'], bonfolder, bonfile), bone_cv)
         else:
           joifolder, joifile = '', ''
           bonfolder, bonfile = '', ''
-
         et.set_fields([ctxfolder, ctxfile,
                        bodfolder, bodfile,
                        facfolder, facfile,
                        joifolder, joifile,
                        bonfolder, bonfile])
-
-      data_set.append(et)
+        if dataset_type == 'train':
+          row = [et.cat, et.cont,
+                 et.cf, et.cn, et.pf, et.pn, et.ff, et.fn, et.jf, et.jn, et.bf, et.bn]
+        else:
+          row = [et.comb_cat, et.comb_cont,
+                 et.cf, et.cn, et.pf, et.pn, et.ff, et.fn, et.jf, et.jn, et.bf, et.bn]
+        filewriter.writerow(row)
       if idx % 1000 == 0 and debug_mode==False:
         print (" Preprocessing data. Index = ", idx)
       elif idx % 20 == 0 and debug_mode==True:
         print (" Preprocessing data. Index = ", idx)
-      idx = idx + 1
-      if debug_mode == True:
-        break
-  print (to_break, path_not_exist, cat_cont_zero)
-  
-  csv_path = os.path.join(save_dirs['annotation'], "%s.csv" %(dataset_type))
-  with open(csv_path, 'w') as csvfile:
-    filewriter = csv.writer(csvfile, delimiter=',', dialect='excel')
-    row = ['Categorical_Labels', 'Continuous_Labels',
-           'ContextFolder','ContextFile',
-           'BodyFolder','BodyFile',
-           'FaceFolder','FaceFile',
-           'JointFolder','JointFile',
-           'BoneFolder','BoneFile']
-    filewriter.writerow(row)
-    for ex in data_set:
-        if dataset_type == 'train':
-            row = [ex.cat, ex.cont,
-                   ex.cf, ex.cn, ex.pf, ex.pn, ex.ff, ex.fn, ex.jf, ex.jn, ex.bf, ex.bn]
-        else:
-            row = [ex.comb_cat, ex.comb_cont,
-                   ex.cf, ex.cn, ex.pf, ex.pn, ex.ff, ex.fn, ex.jf, ex.jn, ex.bf, ex.bn]
-        filewriter.writerow(row)
-  print ('wrote file ', csv_path)
+    
+    if debug_mode == True:
+      print ('breaking at idx=%d, %d' %(ex_idx, idx))
+      break
+  csvfile.close()
 
-  # if generate_npy == True: 
-  #   context_arr = np.array(context_arr)
-  #   body_arr = np.array(body_arr)
-  #   cat_arr = np.array(cat_arr)
-  #   cont_arr = np.array(cont_arr)
-  #   print (len(data_set), context_arr.shape, body_arr.shape)
-  #   np.save(os.path.join(save_dir,'%s_context_arr.npy' %(dataset_type)), context_arr)
-  #   np.save(os.path.join(save_dir,'%s_body_arr.npy' %(dataset_type)), body_arr)
-  #   np.save(os.path.join(save_dir,'%s_cat_arr.npy' %(dataset_type)), cat_arr)
-  #   np.save(os.path.join(save_dir,'%s_cont_arr.npy' %(dataset_type)), cont_arr)
-  #   print (context_arr.shape, body_arr.shape, cat_arr.shape, cont_arr.shape)
+  print ('Errors:',to_break, 'No exists:', path_not_exist, 'Bad label', cat_cont_zero)
+  
+  print ('wrote file ', csv_path)
   print ('completed generating %s data files' %(dataset_type))
 
 '''  
