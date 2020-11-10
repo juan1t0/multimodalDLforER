@@ -46,6 +46,7 @@ def test_AP(cat_preds, cat_labels, n_classes=26):
 	return ap.mean()
 
 
+# modal could be: all, pose , context, body, face
 def train(Model, dataset, Loss, optimizer,
 					epoch=0, model_saved_dir='checkpoints', save_model=False,
 					modal='all', device=torch.device('cpu'), debug_mode=False):
@@ -55,16 +56,19 @@ def train(Model, dataset, Loss, optimizer,
 	loss_values= []
 	
 	for batch_idx, batch_sample in enumerate(loader):
-		sample = dict()
 		with torch.no_grad():
 			if modal == 'all':
-				sample['context_data'] = batch_sample['cntx'].float().to(device)
-				sample['body_data'] = batch_sample['body'].float().to(device)
-				sample['face_data'] = batch_sample['face'].float().to(device)
-				sample['joint_data'] = batch_sample['sklj'].float().to(device)
-				sample['bone_data'] = batch_sample['sklb'].float().to(device)
+				sample = dict()
+				sample['context'] = batch_sample['context'].float().to(device)
+				sample['body'] = batch_sample['body'].float().to(device)
+				sample['face'] = batch_sample['face'].float().to(device)
+				sample['joint'] = batch_sample['sklj'].float().to(device)
+				sample['bone'] = batch_sample['sklb'].float().to(device)
+			elif modal == 'pose':
+				sample = (batch_sample['sklj'].float().to(device),
+									batch_sample['sklb'].float().to(device))
 			else:
-				sample[modal[0]] = batch_sample[modal[1]].float().to(device)
+				sample = batch_sample[modal].float().to(device)
 			
 			label = batch_sample['label'].float().to(device)
 

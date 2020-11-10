@@ -149,6 +149,10 @@ class Model(nn.Module):
 		# print('Model total number of params:', count_params(self))
 
 	def forward(self, fv, fe):
+		if isinstance(fv, tuple):
+			fe = fv[1]
+			fv = fv[0]
+
 		N, C, T, V_node, M = fv.shape
 		_, _, _, V_edge, _ = fe.shape
 
