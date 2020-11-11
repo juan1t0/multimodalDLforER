@@ -5,6 +5,7 @@ import cv2
 
 import torch
 from torch.utils.data import Dataset#, DataLoader
+from torch.utils.data.dataloader import default_collate
 
 '''
 	revisar todo / comentar
@@ -26,13 +27,18 @@ def draw_points(image, points, color_palette='tab20', palette_samples=16):
 			image = cv2.circle(image, (int(pt[1]), int(pt[0])), circle_size, tuple(colors[i % len(colors)]), -1)
 	return image
 
+def my_collate(batch):
+  batch = filter(lambda img: img is not None, batch)
+  return default_collate(list(batch))
+
 class Emotic_MultiDB(Dataset):
 	# This Dataset provide the process adecuated input for MER
 	def __init__ (self,
-								root_dir='/Emotic_MDB',
-								annotation_dir='/annotations',
+								root_dir='Emotic_MDB',
+								annotation_dir='annotations',
 								mode='train',
-								modals_names=[],
+								modality='all',
+								modals_dirs=[],
 								categories=[],
 								continuous=[],
 								transform=None):
@@ -41,39 +47,54 @@ class Emotic_MultiDB(Dataset):
 		self.RootDir = root_dir
 		self.Mode = mode
 		self.AnnotationDir = os.path.join(root_dir, annotation_dir)
-		self.Modals = modals_names
+		self.Modality = modality
 		self.Categories = categories
 		self.Continuous = continuous
 		self.Transform = transform
-		self.loadData()
+		self.loadData(modals_dirs)
 
-	def loadData(self):
+	def loadData(self, modals_dirs):
 		self.Annotations = pd.read_csv(os.path.join(self.AnnotationDir,self.Mode + '.csv'))
 		md = []
-		for nm in self.Modals:
+		for nm in modals_dirs:
 			if '-' in nm:
 				nm = nm.split('-')
+				md.append(os.path.join(self.RootDir, self.Mode, nm[0], nm[1]))
+				continue
 			md.append(os.path.join(self.RootDir, self.Mode, nm))
 		self.ModalsDirs = md
 
 	def __len__(self):
-		return len(self.Annotations[0])
+		return len(self.Annotations)
 
 	def __getitem__(self, idx):
 		if torch.is_tensor(idx):
 			 idx = idx.tolist()
-    
-		ctx_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 2],self.Annotations.iloc[idx, 3])
-		bod_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 4],self.Annotations.iloc[idx, 5])
-		fac_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 6],self.Annotations.iloc[idx, 7])
-		joi_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 8],self.Annotations.iloc[idx, 9])
-		bon_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 10],self.Annotations.iloc[idx, 11])
 		
+		ctx_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 2],self.Annotations.iloc[idx, 3])
 		npctx = np.load(ctx_dir)
-		npbod = np.load(bod_dir)
-		npfac = np.load(fac_dir)
-		npjoi = np.load(joi_dir)
-		npbon = np.load(bon_dir)
+	
+		bod_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 4],self.Annotations.iloc[idx, 5])
+		npbod = cv2.resize(np.load(bod_dir),(224,224))
+		
+		if isinstance(self.Annotations.iloc[idx, 7], str):
+			fac_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 6],self.Annotations.iloc[idx, 7])
+			npfac = np.load(fac_dir)
+		else:
+			if self.Modality == 'face':
+				return None
+			npfac = np.zeros((64,64,3))
+		
+		if isinstance(self.Annotations.iloc[idx, 9], str):
+			joi_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 8],self.Annotations.iloc[idx, 9])
+			npjoi = np.load(joi_dir)
+			bon_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 10],self.Annotations.iloc[idx, 11])
+			npbon = np.load(bon_dir)
+		else:
+			if self.Modality == 'pose':
+				return None
+			npjoi = np.zeros((3, 1, 15, 1))
+			npbon = np.zeros((3, 1, 15, 1))
 		
 		if len(self.Continuous)==0:
 			nplbl = self.getlabel(self.Annotations.iloc[idx,0])
@@ -81,11 +102,11 @@ class Emotic_MultiDB(Dataset):
 			nplbl = self.getlabel(self.Annotations.iloc[idx,1])
 
 		sample = {'label': nplbl,
-			'context_mask': npctx,
-			'body_mask': npbod,
-			'face_mask': npfac,
-			'vertex_joints': npjoi,
-			'edges_bones': npbon}
+			'context': npctx,
+			'body': npbod,
+			'face': npfac,
+			'joints': npjoi,
+			'bones': npbon}
 		
 		if self.Transform:
 			sample = self.Transform(sample)

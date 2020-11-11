@@ -122,6 +122,18 @@ class ResNet(nn.Module):
 			elif isinstance(m, nn.BatchNorm2d):
 				nn.init.constant_(m.weight, 1)
 				nn.init.constant_(m.bias, 0)
+	def freeze_backbone(self):
+		self.conv1.parameters().requires_grad = False
+		self.bn1.parameters().requires_grad = False
+		self.relu.parameters().requires_grad = False
+		self.maxpool.parameters().requires_grad = False
+		
+		for para in self.layer1.parameters():
+			param.requires_grad = False
+		for para in self.layer2.parameters():
+			param.requires_grad = False
+		for para in self.layer3.parameters():
+			param.requires_grad = False
 
 	def _make_layer(self, block, planes, blocks, stride=1, down_size=True):
 			downsample = None
@@ -176,17 +188,17 @@ class ResNet(nn.Module):
 
 		return ax, rx, [self.att, fe, per]
 
-'''
-pretrained_dict = ...
-model_dict = model.state_dict()
+#############################################################
+# pretrained_dict = ...
+# model_dict = model.state_dict()
 
-# 1. filter out unnecessary keys
-pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-# 2. overwrite entries in the existing state dict
-model_dict.update(pretrained_dict) 
-# 3. load the new state dict
-model.load_state_dict(pretrained_dict)
-'''
+# # 1. filter out unnecessary keys
+# pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+# # 2. overwrite entries in the existing state dict
+# model_dict.update(pretrained_dict) 
+# # 3. load the new state dict
+# model.load_state_dict(pretrained_dict)
+
 def resnet18(pretrained=False, num_classes=1000):
 	model = ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
 	if pretrained:

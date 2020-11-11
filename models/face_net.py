@@ -37,6 +37,10 @@ class ShortVGG(nn.Module):
 		out = self.classifier(out)
 		return out
 
+	def freeze_backbone(self):
+		for para in self.features.parameters():
+			param.requires_grad = False
+
 	def _make_layers(self, cfg):
 		layers = []
 		in_channels = 3
@@ -51,25 +55,13 @@ class ShortVGG(nn.Module):
 		
 		layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
 		return nn.Sequential(*layers)
-	
+
 	def load_pretrain(self):
-		state_dict = load_state_dict_from_url(model_urls[self.name])
-		currstate = self.state_dict()
-		m = 0
-		for name, param in state_dict.items():
-			if name not in currstate:
-				continue
-			if isinstance(param, torch.nn.parameter.Parameter):
-				# backwards compatibility for serialized parameters
-				param = param.data
-			try:
-				currstate[name].copy_(param)
-				currstate[name].requires_grad = False
-				m += 1
-			except:
-				print('missing', name)
-				pass
-		print(m,'modules loaded')
+		pretrained_dict = load_state_dict_from_url(model_urls[self.name])
+		model_dict = self.state_dict()
+		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+		model_dict.update(pretrained_dict) 
+		self.load_state_dict(pretrained_dict)
 
 def getTorchVGG(numclasses, pretrained=False):
 	model = vgg19(pretrained)

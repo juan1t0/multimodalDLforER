@@ -8,7 +8,6 @@ from torch.utils.data import DataLoader
 
 from sklearn.metrics import average_precision_score, precision_recall_curve
 
-
 class DiscreteLoss(nn.Module):
 	def __init__(self, weight_type='mean', device=torch.device('cpu')):
 		super(DiscreteLoss, self).__init__()
@@ -37,14 +36,12 @@ class DiscreteLoss(nn.Module):
 		weights[target_stats == 0] = 0.0001
 		return weights
 
-
 def test_AP(cat_preds, cat_labels, n_classes=26):
 	ap = np.zeros(n_classes, dtype=np.float32)
 	for i in range(n_classes):
 		ap[i] = average_precision_score(cat_labels[i, :], cat_preds[i, :])
 	print ('AveragePrecision: {} |{}| mAP: {}'.format(ap, ap.shape[0], ap.mean()))
 	return ap.mean()
-
 
 # modal could be: all, pose , context, body, face
 def train(Model, dataset, Loss, optimizer,
@@ -59,28 +56,37 @@ def train(Model, dataset, Loss, optimizer,
 		with torch.no_grad():
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].float().to(device)
-				sample['body'] = batch_sample['body'].float().to(device)
-				sample['face'] = batch_sample['face'].float().to(device)
-				sample['joint'] = batch_sample['sklj'].float().to(device)
-				sample['bone'] = batch_sample['sklb'].float().to(device)
+				sample['context'] = batch_sample['context'].float().permute(0,3,1,2).to(device)
+				sample['body'] = batch_sample['body'].float().permute(0,3,1,2).to(device)
+				sample['face'] = batch_sample['face'].float().permute(0,3,1,2).to(device)
+				sample['joint'] = batch_sample['joint'].float().to(device)
+				sample['bone'] = batch_sample['bone'].float().to(device)
 			elif modal == 'pose':
-				sample = (batch_sample['sklj'].float().to(device),
-									batch_sample['sklb'].float().to(device))
+				sample = (batch_sample['joint'].float().to(device),
+									batch_sample['bone'].float().to(device))
 			else:
-				sample = batch_sample[modal].float().to(device)
+				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
 			
 			label = batch_sample['label'].float().to(device)
 
 		optimizer.zero_grad()
-		output = Model.forward(sample)
-
-		loss = Loss(output, label)
+		if modal =='pose':
+			output, _ = Model.forward(sample)
+			loss = Loss(output, label)
+		elif modal == 'body' or modal == 'context':
+			att_outs, per_outs, _ = Model.forward(sample)
+			loss = (Loss(att_outs, label)) + (Loss(per_outs, label))
+		elif modal == 'all':
+			output, _ = Model.forward(sample)
+			loss = Loss(output, label)
+		
 		loss.backward()
 		optimizer.step()
 
 		loss_values.append(loss.item())
+	
 	gloss = np.mean(loss_values)
+	
 	if debug_mode:
 		print ('\tMean training loss: {:.4f} ; epoch {}'.format(gloss, epoch+1))
 		# print ('\tMean training acc: {:.4f} ; epoch {}'.format(np.mean(acc_values), epoch))
@@ -90,8 +96,8 @@ def train(Model, dataset, Loss, optimizer,
 		model_saved_name = os.path.join(model_saved_dir, Model.name +'_cp_'+ str(epoch+1) + '.pth')
 		torch.save(weights, model_saved_name)
 		print ('Model {} saved'.format(model_saved_name))
+	
 	return gloss
-
 
 def eval(Model, dataset, epoch=0, model_saved_dir='checkpoints', save_model=False,
 				 modal='all', device=torch.device('cpu'), debug_mode=False):
@@ -103,16 +109,22 @@ def eval(Model, dataset, epoch=0, model_saved_dir='checkpoints', save_model=Fals
 		sample = dict()
 		with torch.no_grad():
 			if modal == 'all':
-				sample['context_data'] = batch_sample['cntx'].float().to(device)
-				sample['body_data'] = batch_sample['body'].float().to(device)
-				sample['face_data'] = batch_sample['face'].float().to(device)
-				sample['joint_data'] = batch_sample['sklj'].float().to(device)
-				sample['bone_data'] = batch_sample['sklb'].float().to(device)
+				sample = dict()
+				sample['context'] = batch_sample['context'].float().permute(0,3,1,2).to(device)
+				sample['body'] = batch_sample['body'].float().permute(0,3,1,2).to(device)
+				sample['face'] = batch_sample['face'].float().permute(0,3,1,2).to(device)
+				sample['joint'] = batch_sample['joint'].float().to(device)
+				sample['bone'] = batch_sample['bone'].float().to(device)
+				output, _ = Model.forward(sample)
+			elif modal == 'pose':
+				sample = (batch_sample['joint'].float().to(device),
+									batch_sample['bone'].float().to(device))
+				output, _ = Model.forward(sample)
 			else:
-				sample[modal[0]] = batch_sample[modal[1]].float().to(device)
+				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
+				_, output, _ = Model.forward(sample)
 			
-			label = batch_sample['label'].float()
-			output = Model.forward(sample)
+			label = batch_sample['label'].float() # .to(device)
 		
 		predictions[(batch_idx*32):(batch_idx*32 +32),:] = output.to('cpu').data.numpy()
 		labels[(batch_idx*32):(batch_idx*32 +32),:] = label.data.numpy()
