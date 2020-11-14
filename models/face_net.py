@@ -37,10 +37,6 @@ class ShortVGG(nn.Module):
 		out = self.classifier(out)
 		return out
 
-	def freeze_backbone(self):
-		for para in self.features.parameters():
-			param.requires_grad = False
-
 	def _make_layers(self, cfg):
 		layers = []
 		in_channels = 3

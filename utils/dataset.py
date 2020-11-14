@@ -51,6 +51,7 @@ class Emotic_MultiDB(Dataset):
 		self.Categories = categories
 		self.Continuous = continuous
 		self.Transform = transform
+		self.Relabel = False
 		self.loadData(modals_dirs)
 
 	def loadData(self, modals_dirs):
@@ -66,6 +67,11 @@ class Emotic_MultiDB(Dataset):
 
 	def __len__(self):
 		return len(self.Annotations)
+
+	def relabeled(self, newlabels):
+		self.Relabel = True
+		self.NewLabel = newlabels
+		self.Categories = list(newlabels['cat'].keys())
 
 	def __getitem__(self, idx):
 		if torch.is_tensor(idx):
@@ -115,11 +121,15 @@ class Emotic_MultiDB(Dataset):
 	
 	def getlabel(self, categories):
 		curr_categories = [ct[1:-1].replace('\'','') for ct in (categories[1:-1]).split(',')]
-		
 		lbl = np.zeros(len(self.Categories))
 		for i, ct in enumerate(self.Categories):
+			if self.Relabel:
+				for cct in self.NewLabel['cat'][ct]:
+					if cct in curr_categories:
+						lbl[i] = 1.0
 			if ct in curr_categories:
 				lbl[i] = 1.0
+		
 		return lbl
 
 class Emotic_MDB(Dataset):
