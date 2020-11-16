@@ -87,14 +87,14 @@ def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
 			label = batch_sample['label'].float().to(device)
 
 		optimizer.zero_grad()
-		if modal =='pose' or modal == 'face':
+		if modal =='pose':
+			output, _ = Model.forward(sample, 0)
+			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+			loss = Loss(output, label)
+		elif modal == 'face':
 			output, _ = Model.forward(sample)
 			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
 			loss = Loss(output, label)
-		# elif modal == 'face':
-		# 	output, _ = Model.forward(sample)
-		# 	predictions += [output[i].data.numpy() for i in range(output.shape[0])]
-		# 	loss = Loss(output, label)
 		elif modal == 'body' or modal == 'context':
 			per_outs, att_outs, _ = Model.forward(sample)
 			predictions += [per_outs[i].data.numpy() for i in range(per_outs.shape[0])]
@@ -154,7 +154,7 @@ def eval(Model, dataset, collate=None, epoch=0, modal='all',
 			elif modal == 'pose':
 				sample = (batch_sample['joint'].float().to(device),
 									batch_sample['bone'].float().to(device))
-				output, _ = Model.forward(sample)
+				output, _ = Model.forward(sample,0)
 				predictions += [output[i].data.numpy() for i in range(output.shape[0])]
 			else:
 				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
