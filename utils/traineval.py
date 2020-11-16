@@ -38,17 +38,27 @@ class DiscreteLoss(nn.Module):
 		weights[target_stats == 0] = 0.0001
 		return weights
 
+def savemodel(epoch, model_dict, opt_dict, loss,
+							save_dir, modelname, save_name):
+	model_saved_name = os.path.join(save_dir,modelname + save_name +'.pth')
+	torch.save({'epoch':epoch,
+							'loss':loss,
+							'model_state_dict':model_dict,
+							'optimizer_state_dict':opt_dict},
+						 model_saved_name)
+	print('Model {} saved'.format(model_saved_name))
+
 def test_AP(cat_preds, cat_labels, n_classes=8):
 	ap = np.zeros(n_classes, dtype=np.float32)
 	for i in range(n_classes):
 		ap[i] = average_precision_score(cat_labels[i, :], cat_preds[i, :])
+	ap[np.isnan(ap)] = 0.0
 	print ('AveragePrecision: {} |{}| mAP: {}'.format(ap, ap.shape[0], ap.mean()))
 	return ap.mean()
 
 # modal could be: all, pose , context, body, face
-def train(Model, dataset, Loss, optimizer, collate=None,
-					epoch=0, model_saved_dir='checkpoints', save_model=False, save_name='',
-					modal='all', device=torch.device('cpu'), debug_mode=False, tqdm=None):
+def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
+				  device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.train()
 	if collate is not None:
 		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0, collate_fn=collate),
@@ -56,7 +66,7 @@ def train(Model, dataset, Loss, optimizer, collate=None,
 	else:
 		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0),
 									unit='batch')
-	loader.set_description("{} Epoch {}".format(dataset.mode, epoch + 1))
+	loader.set_description("{} Epoch {}".format(dataset.Mode, epoch + 1))
 	loss_values = []
 	predictions, labeles = [], []
 	for batch_idx, batch_sample in enumerate(loader):
@@ -77,16 +87,16 @@ def train(Model, dataset, Loss, optimizer, collate=None,
 			label = batch_sample['label'].float().to(device)
 
 		optimizer.zero_grad()
-		if modal =='pose':
+		if modal =='pose' or modal == 'face':
 			output, _ = Model.forward(sample)
 			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
 			loss = Loss(output, label)
-		elif modal == 'face':
-			output = Model.forward(sample)
-			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
-			loss = Loss(output, label)
+		# elif modal == 'face':
+		# 	output, _ = Model.forward(sample)
+		# 	predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+		# 	loss = Loss(output, label)
 		elif modal == 'body' or modal == 'context':
-			att_outs, per_outs, _ = Model.forward(sample)
+			per_outs, att_outs, _ = Model.forward(sample)
 			predictions += [per_outs[i].data.numpy() for i in range(per_outs.shape[0])]
 			loss = (Loss(att_outs, label)) + (Loss(per_outs, label))
 		elif modal == 'all':
@@ -109,17 +119,17 @@ def train(Model, dataset, Loss, optimizer, collate=None,
 	if debug_mode:
 		print ('- Mean training loss: {:.4f} ; epoch {}'.format(gloss, epoch+1))
 		print ('- Mean training mAP: {:.4f} ; epoch {}'.format(mAP, epoch))
-	if save_model:
-		weights = Model.state_dict()
-		# weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in weights.items()])
-		model_saved_name = os.path.join(model_saved_dir, save_name +'_last.pth')
-		torch.save(weights, model_saved_name)
-		print ('Model {} saved'.format(model_saved_name))
+	# if save_model:
+	# 	weights = Model.state_dict()
+	# 	# weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in weights.items()])
+	# 	model_saved_name = os.path.join(model_saved_dir, save_name +'_last.pth')
+	# 	torch.save(weights, model_saved_name)
+	# 	print ('Model {} saved'.format(model_saved_name))
 	
 	return gloss, mAP
 
-def eval(Model, dataset, collate=None, epoch=0, model_saved_dir='checkpoints', save_model=False,
-				modal='all', device=torch.device('cpu'), debug_mode=False, tqdm=None):
+def eval(Model, dataset, collate=None, epoch=0, modal='all',
+				 device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.eval()
 	if collate is not None:
 		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0, collate_fn=collate),
@@ -127,7 +137,7 @@ def eval(Model, dataset, collate=None, epoch=0, model_saved_dir='checkpoints', s
 	else:
 		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0),
 									unit='batch')
-	loader.set_description("{} Epoch {}".format(dataset.mode, epoch + 1))
+	loader.set_description("{} Epoch {}".format(dataset.Mode, epoch + 1))
 	predictions, labeles = [], []
 	for batch_idx, batch_sample in enumerate(loader):
 		sample = dict()
@@ -149,9 +159,9 @@ def eval(Model, dataset, collate=None, epoch=0, model_saved_dir='checkpoints', s
 			else:
 				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
 				if modal == 'face':
-					output = Model.forward(sample)
+					output, _ = Model.forward(sample)
 				else:
-					_, output, _ = Model.forward(sample)
+					output, _, _ = Model.forward(sample)
 				predictions += [output[i].data.numpy() for i in range(output.shape[0])]
 			
 			label = batch_sample['label'].float() # .to(device)
@@ -162,8 +172,8 @@ def eval(Model, dataset, collate=None, epoch=0, model_saved_dir='checkpoints', s
 		# value, predict_label = torch.max(output, 1)
 		# acc_values.append(torch.mean((predict_label == label).float()))
 
-	predictions = np.asarray(predictions).T
-	labels = np.asarray(labels).T
-	mAP = test_AP(predictions, labels, n_classes=8)
+	# predictions = np.asarray(predictions).T
+	# labels = np.asarray(labels).T
+	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
 	
 	return mAP

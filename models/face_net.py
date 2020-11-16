@@ -24,18 +24,20 @@ model_urls = {
 class ShortVGG(nn.Module):
 	def __init__(self, vgg_name, numclasses, pretrain=False):
 		super(ShortVGG, self).__init__()
-		self.name = vgg_name
-		self.features = self._make_layers(cfg[self.vgg_name])
+		self.Name = vgg_name
+		self.features = self._make_layers(cfg[vgg_name])
+		self.avgpool = nn.AvgPool2d(kernel_size=1, stride=1)
 		self.classifier = nn.Linear(512, numclasses)
 		if pretrain:
-			load_pretrain()
+			self.load_pretrain()
 
 	def forward(self, x):
 		out = self.features(x)
+		out = self.avgpool(out)
 		out = out.view(out.size(0), -1)
 		out = F.dropout(out, p=0.5, training=self.training)
-		out = self.classifier(out)
-		return out
+		out_cl = self.classifier(out)
+		return out_cl, out
 
 	def _make_layers(self, cfg):
 		layers = []
@@ -45,31 +47,46 @@ class ShortVGG(nn.Module):
 				layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
 			else:
 				layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1),
-									 nn.BatchNorm2d(x),
-									 nn.ReLU(inplace=True)]
+									nn.BatchNorm2d(x),
+									nn.ReLU(inplace=True)]
 				in_channels = x
 		
-		layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+		# layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
 		return nn.Sequential(*layers)
 
 	def load_pretrain(self):
-		pretrained_dict = load_state_dict_from_url(model_urls[self.name])
-		model_dict = self.state_dict()
-		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		model_dict.update(pretrained_dict) 
-		self.load_state_dict(pretrained_dict)
+		state_dict = load_state_dict_from_url(model_urls[self.Name])
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+		currstate = self.state_dict()
+		ml, mm = 0, 0
+		for name, param in state_dict.items():
+			if name not in currstate:
+				continue
+			if isinstance(param, torch.nn.parameter.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			try:
+				currstate[name].copy_(param)
+				# currstate[name].requires_grad = False
+				ml += 1
+			except:
+				print('missing', name)
+				mm += 1
+				pass
+		self.load_state_dict(currstate)
+		print('{} modules loaded and {} modules missing'.format(ml,mm))
 
 def getTorchVGG(numclasses, pretrained=False):
 	model = vgg19(pretrained)
 	for param in model.parameters():
 		param.requires_grad = False
 	model.classifier = nn.Sequential(nn.Linear(512 * 7 * 7, 4096),
-																	 nn.ReLU(True),
-																	 nn.Dropout(),
-																	 nn.Linear(4096, 1024),
-																	 nn.ReLU(True),
-																	 nn.Dropout(),
-																	 nn.Linear(1024, numclasses))
+																	nn.ReLU(True),
+																	nn.Dropout(),
+																	nn.Linear(4096, 1024),
+																	nn.ReLU(True),
+																	nn.Dropout(),
+																	nn.Linear(1024, numclasses))
 	
 	return model
 

@@ -164,7 +164,7 @@ class ResNet(nn.Module):
 		# self.att = self.att.view(bs, 1, ys, xs)
 		ax = self.att_conv2(ax)
 		ax = self.att_gap(ax)
-		ax = ax.view(ax.size(0), -1)
+		out_ax = ax.view(ax.size(0), -1)
 
 		rx = x * self.att
 		rx = rx + x
@@ -172,61 +172,148 @@ class ResNet(nn.Module):
 		rx = self.layer4(rx)
 		rx = self.avgpool(rx)
 		rx = rx.view(rx.size(0), -1)
-		rx = self.fc(rx)
+		out_rx = self.fc(rx)
 
-		return ax, rx, [self.att, fe, per]
+		return out_rx, out_ax, [fe, self.att, per, rx]
+
+# pretrained_dict = load_state_dict_from_url(model_urls['resnet18'])
+		# model_dict = model.state_dict()
+		# pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+		# model_dict.update(pretrained_dict)
+		# model.load_state_dict(pretrained_dict)
+		# print('model loaded from {}'.format(model_urls['resnet18']))
 
 def resnet18(pretrained=False, num_classes=1000):
 	model = ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
-	if pretrained:
-		pretrained_dict = load_state_dict_from_url(model_urls['resnet18'])
-		model_dict = model.state_dict()
-		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		model_dict.update(pretrained_dict)
-		model.load_state_dict(pretrained_dict)
-		print('model loaded from {}'.format(model_urls['resnet18']))
+	if pretrained:	
+		state_dict = load_state_dict_from_url(model_urls['resnet18'])
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+		currstate = model.state_dict()
+		ml, mm = 0, 0
+		for name, param in state_dict.items():
+			if name not in currstate:
+				print('no match', name)
+				mm += 1
+				continue
+			if isinstance(param, torch.nn.parameter.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			try:
+				currstate[name].copy_(param)
+				# currstate[name].requires_grad = False
+				ml += 1
+			except:
+				print('missing', name)
+				mm += 1
+				pass
+		model.load_state_dict(currstate)
+		print('{} modules loaded and {} modules missing or no matching'.format(ml,mm))
 	return model
 
 def resnet34(pretrained=False, num_classes=1000):
 	model = ResNet(BasicBlock, [3, 4, 6, 3], num_classes)
 	if pretrained:
-		pretrained_dict = load_state_dict_from_url(model_urls['resnet34'])
-		model_dict = model.state_dict()
-		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		model_dict.update(pretrained_dict)
-		model.load_state_dict(pretrained_dict)
-		print('model loaded from {}'.format(model_urls['resnet34']))
+		state_dict = load_state_dict_from_url(model_urls['resnet34'])
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+		currstate = model.state_dict()
+		ml, mm = 0, 0
+		for name, param in state_dict.items():
+			if name not in currstate:
+				print('no match', name)
+				mm += 1
+				continue
+			if isinstance(param, torch.nn.parameter.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			try:
+				currstate[name].copy_(param)
+				# currstate[name].requires_grad = False
+				ml += 1
+			except:
+				print('missing', name)
+				mm += 1
+				pass
+		model.load_state_dict(currstate)
+		print('{} modules loaded and {} modules missing or no matching'.format(ml,mm))
 	return model
 
 def resnet50(pretrained=False, num_classes=1000):
 	model = ResNet(Bottleneck, [3, 4, 6, 3], num_classes)
 	if pretrained:
-		pretrained_dict = load_state_dict_from_url(model_urls['resnet50'])
-		model_dict = model.state_dict()
-		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		model_dict.update(pretrained_dict)
-		model.load_state_dict(pretrained_dict)
-		print('model loaded from {}'.format(model_urls['resnet50']))
+		state_dict = load_state_dict_from_url(model_urls['resnet50'])
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+		currstate = model.state_dict()
+		ml, mm = 0, 0
+		for name, param in state_dict.items():
+			if name not in currstate:
+				print('no match', name)
+				mm += 1
+				continue
+			if isinstance(param, torch.nn.parameter.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			try:
+				currstate[name].copy_(param)
+				# currstate[name].requires_grad = False
+				ml += 1
+			except:
+				print('missing', name)
+				mm += 1
+				pass
+		model.load_state_dict(currstate)
+		print('{} modules loaded and {} modules missing or no matching'.format(ml,mm))
 	return model
 
 def resnet101(pretrained=False, num_classes=1000):
 	model = ResNet(Bottleneck, [3, 4, 23, 3],  num_classes)
 	if pretrained:
-		pretrained_dict = load_state_dict_from_url(model_urls['resnet101'])
-		model_dict = model.state_dict()
-		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		model_dict.update(pretrained_dict)
-		model.load_state_dict(pretrained_dict)
-		print('model loaded from {}'.format(model_urls['resnet101']))
+		state_dict = load_state_dict_from_url(model_urls['resnet101'])
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+		currstate = model.state_dict()
+		ml, mm = 0, 0
+		for name, param in state_dict.items():
+			if name not in currstate:
+				print('no match', name)
+				mm += 1
+				continue
+			if isinstance(param, torch.nn.parameter.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			try:
+				currstate[name].copy_(param)
+				# currstate[name].requires_grad = False
+				ml += 1
+			except:
+				print('missing', name)
+				mm += 1
+				pass
+		model.load_state_dict(currstate)
+		print('{} modules loaded and {} modules missing or no matching'.format(ml,mm))
 	return model
 
 def resnet152(pretrained=False, num_classes=1000):
 	model = ResNet(Bottleneck, [3, 8, 36, 3], num_classes=1000)
 	if pretrained:
-		pretrained_dict = load_state_dict_from_url(model_urls['resnet152'])
-		model_dict = model.state_dict()
-		pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		model_dict.update(pretrained_dict)
-		model.load_state_dict(pretrained_dict)
-		print('model loaded from {}'.format(model_urls['resnet152']))
+		state_dict = load_state_dict_from_url(model_urls['resnet152'])
+		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+		currstate = model.state_dict()
+		ml, mm = 0, 0
+		for name, param in state_dict.items():
+			if name not in currstate:
+				print('no match', name)
+				mm += 1
+				continue
+			if isinstance(param, torch.nn.parameter.Parameter):
+				# backwards compatibility for serialized parameters
+				param = param.data
+			try:
+				currstate[name].copy_(param)
+				# currstate[name].requires_grad = False
+				ml += 1
+			except:
+				print('missing', name)
+				mm += 1
+				pass
+		model.load_state_dict(currstate)
+		print('{} modules loaded and {} modules missing or no matching'.format(ml,mm))
 	return model

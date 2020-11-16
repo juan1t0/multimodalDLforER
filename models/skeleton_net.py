@@ -114,7 +114,7 @@ class GraphTemporalConv(nn.Module):
 		return self.relu(fv), self.relu(fe)
 
 class Model(nn.Module):
-	def __init__(self, num_class=26, num_point=15, num_person=1, in_channels=3):
+	def __init__(self, num_class=8, num_point=15, num_person=1, in_channels=3):
 		super(Model, self).__init__()
 
 		self.graph = Graph()

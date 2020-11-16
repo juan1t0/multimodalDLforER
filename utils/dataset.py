@@ -31,6 +31,21 @@ def my_collate(batch):
   batch = filter(lambda img: img is not None, batch)
   return default_collate(list(batch))
 
+newlabeles = {'len':8,
+              'cat':{'joy': ['Excitement', 'Happiness', 'Peace',
+                             # 'Affection',
+                             'Pleasure',],
+                     'trust': ['Confidence', 'Esteem',
+                               'Affection',],
+                     'fear': ['Disquietment','Embarrassment','Fear',],
+                     'surprice': ['Doubt/Confusion','Surprise',],
+                     'sadness': ['Pain', 'Sadness', 'Sensitivity', 'Suffering',],
+                     'disgust': ['Aversion','Disconnection', 'Fatigue','Yearning'],
+                     'anger': ['Anger', 'Annoyance', 'Disapproval',],
+                     'anticipation': ['Anticipation', 'Engagement', 'Sympathy',]
+										 }
+              }
+
 class Emotic_MultiDB(Dataset):
 	# This Dataset provide the process adecuated input for MER
 	def __init__ (self,
@@ -52,6 +67,7 @@ class Emotic_MultiDB(Dataset):
 		self.Continuous = continuous
 		self.Transform = transform
 		self.Relabel = False
+		self.Resize_Face = None
 		self.loadData(modals_dirs)
 
 	def loadData(self, modals_dirs):
@@ -73,6 +89,9 @@ class Emotic_MultiDB(Dataset):
 		self.NewLabel = newlabels
 		self.Categories = list(newlabels['cat'].keys())
 
+	def resizeFace(self, newsize):
+		self.Resize_Face = newsize
+	
 	def __getitem__(self, idx):
 		if torch.is_tensor(idx):
 			 idx = idx.tolist()
@@ -83,21 +102,23 @@ class Emotic_MultiDB(Dataset):
 		bod_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 4],self.Annotations.iloc[idx, 5])
 		npbod = cv2.resize(np.load(bod_dir),(224,224))
 		
-		if isinstance(self.Annotations.iloc[idx, 7], str):
+		if isinstance(self.Annotations.iloc[idx, 7], str): # there are face
 			fac_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 6],self.Annotations.iloc[idx, 7])
 			npfac = np.load(fac_dir)
+			if self.Resize_Face is not None:
+				npfac = cv2.resize(npfac, self.Resize_Face)
 		else:
-			if self.Modality == 'face':
+			if self.Modality == 'face': # there are not face, but it is required
 				return None
 			npfac = np.zeros((64,64,3))
 		
-		if isinstance(self.Annotations.iloc[idx, 9], str):
+		if isinstance(self.Annotations.iloc[idx, 9], str): # there are posture
 			joi_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 8],self.Annotations.iloc[idx, 9])
 			npjoi = np.load(joi_dir)
 			bon_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 10],self.Annotations.iloc[idx, 11])
 			npbon = np.load(bon_dir)
 		else:
-			if self.Modality == 'pose':
+			if self.Modality == 'pose': # there are not pose, but it is required
 				return None
 			npjoi = np.zeros((3, 1, 15, 1))
 			npbon = np.zeros((3, 1, 15, 1))
@@ -121,12 +142,17 @@ class Emotic_MultiDB(Dataset):
 	
 	def getlabel(self, categories):
 		curr_categories = [ct[1:-1].replace('\'','') for ct in (categories[1:-1]).split(',')]
+		if self.Continuous:
+			lbl = np.zeros(len(self.Continuous))
+			# not yet
+			return lbl
 		lbl = np.zeros(len(self.Categories))
 		for i, ct in enumerate(self.Categories):
 			if self.Relabel:
 				for cct in self.NewLabel['cat'][ct]:
 					if cct in curr_categories:
 						lbl[i] = 1.0
+				continue
 			if ct in curr_categories:
 				lbl[i] = 1.0
 		
