@@ -132,8 +132,8 @@ class Emotic_MultiDB(Dataset):
 			'context': npctx,
 			'body': npbod,
 			'face': npfac,
-			'joints': npjoi,
-			'bones': npbon}
+			'joint': npjoi,
+			'bone': npbon}
 		
 		if self.Transform:
 			sample = self.Transform(sample)
