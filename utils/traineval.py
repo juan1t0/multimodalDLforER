@@ -89,25 +89,25 @@ def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
 		optimizer.zero_grad()
 		if modal =='pose':
 			output, _ = Model.forward(sample, 0)
-			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+			predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			loss = Loss(output, label)
 		elif modal == 'face':
 			output, _ = Model.forward(sample)
-			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+			predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			loss = Loss(output, label)
 		elif modal == 'body' or modal == 'context':
 			per_outs, att_outs, _ = Model.forward(sample)
-			predictions += [per_outs[i].data.numpy() for i in range(per_outs.shape[0])]
+			predictions += [per_outs[i].to('cpu').data.numpy() for i in range(per_outs.shape[0])]
 			loss = (Loss(att_outs, label)) + (Loss(per_outs, label))
 		elif modal == 'all':
 			output, _ = Model.forward(sample)
-			predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+			predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			loss = Loss(output, label)
 
 		loss.backward()
 		optimizer.step()
 
-		labeles += [label[i].data.numpy() for i in range(label.shape[0])]
+		labeles += [label[i].to('cpu').data.numpy() for i in range(label.shape[0])]
 		
 		loss_values.append(loss.item())
 		loader.set_postfix(loss=loss.item())
