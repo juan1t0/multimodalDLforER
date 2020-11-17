@@ -178,10 +178,10 @@ def eval(Model, dataset, collate=None, epoch=0, modal='all',
 	
 	return mAP
 
-def train_step(Model, dataset, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
-								train_loss, train_map, val_loss, val_map, maxacc, checkpointdir, model_name):
+def train_step(Model, dataset_t, dataset_v, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
+								train_loss, train_map, val_loss, val_map, maxacc, step2val, step2save, checkpointdir, model_name):
 	
-	l, a = train(Model=Model, dataset=dataset, Loss=Loss, optimizer=optimizer,collate=collate,
+	l, a = train(Model=Model, dataset=dataset_t, Loss=Loss, optimizer=optimizer,collate=collate,
 								epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
 	train_loss[epoch] = l
 	train_map[epoch] = a
@@ -192,12 +192,12 @@ def train_step(Model, dataset, Loss, optimizer, collate, epoch, last_epoch, moda
 							opt_dict=optimizer.state_dict(),
 							loss=l,
 							save_dir=checkpointdir, modelname=model_name, save_name='_best')
-	if (epoch+1)%3 == 0:
-		l, a = train(Model=Model, dataset=dataset, Loss=Loss, optimizer=optimizer, collate=collate,
+	if (epoch+1) % step2val == 0:
+		l, a = train(Model=Model, dataset=dataset_v, Loss=Loss, optimizer=optimizer, collate=collate,
 									epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
 		val_loss[epoch:epoch+3] = [l]*3
 		val_map[epoch:epoch+3] = [a]*3
-	if (epoch+1)%4 == 0 or (epoch+1) == last_epoch:
+	if (epoch+1) % step2save == 0 or (epoch+1) == last_epoch:
 		savemodel(epoch=epoch,
 							model_dict=Model.state_dict(),
 							opt_dict=optimizer.state_dict(),
