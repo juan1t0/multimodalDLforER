@@ -118,7 +118,7 @@ def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
 	
 	if debug_mode:
 		print ('- Mean training loss: {:.4f} ; epoch {}'.format(gloss, epoch+1))
-		print ('- Mean training mAP: {:.4f} ; epoch {}'.format(mAP, epoch))
+		print ('- Mean training mAP: {:.4f} ; epoch {}'.format(mAP, epoch+1))
 	# if save_model:
 	# 	weights = Model.state_dict()
 	# 	# weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in weights.items()])
@@ -177,3 +177,29 @@ def eval(Model, dataset, collate=None, epoch=0, modal='all',
 	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
 	
 	return mAP
+
+def train_step(Model, dataset, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
+								train_loss, train_map, val_loss, val_map, maxacc, checkpointdir, model_name):
+	
+	l, a = train(Model=Model, dataset=dataset, Loss=Loss, optimizer=optimizer,collate=collate,
+								epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
+	train_loss[epoch] = l
+	train_map[epoch] = a
+	if a > maxacc:
+		maxacc = a
+		savemodel(epoch=epoch,
+							model_dict=Model.state_dict(),
+							opt_dict=optimizer.state_dict(),
+							loss=l,
+							save_dir=checkpointdir, modelname=model_name, save_name='_best')
+	if (epoch+1)%3 == 0:
+		l, a = train(Model=Model, dataset=dataset, Loss=Loss, optimizer=optimizer, collate=collate,
+									epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
+		val_loss[epoch:epoch+3] = [l]*3
+		val_map[epoch:epoch+3] = [a]*3
+	if (epoch+1)%4 == 0 or (epoch+1) == last_epoch:
+		savemodel(epoch=epoch,
+							model_dict=Model.state_dict(),
+							opt_dict=optimizer.state_dict(),
+							loss=l,
+							save_dir='Checkpoints', modelname='posedgcnn', save_name='_last')
