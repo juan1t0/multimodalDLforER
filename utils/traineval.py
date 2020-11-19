@@ -195,5 +195,5 @@ def train_step(Model, dataset_t, dataset_v, Loss, optimizer, collate, epoch, las
 							model_dict=Model.state_dict(),
 							opt_dict=optimizer.state_dict(),
 							loss=l, acc=a,
-							save_dir='Checkpoints', modelname='posedgcnn', save_name='_last')
+							save_dir='Checkpoints', modelname=model_name, save_name='_last')
 	return maxacc
