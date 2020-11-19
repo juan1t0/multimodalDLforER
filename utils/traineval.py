@@ -38,11 +38,12 @@ class DiscreteLoss(nn.Module):
 		weights[target_stats == 0] = 0.0001
 		return weights
 
-def savemodel(epoch, model_dict, opt_dict, loss,
+def savemodel(epoch, model_dict, opt_dict, loss, acc,
 							save_dir, modelname, save_name):
 	model_saved_name = os.path.join(save_dir,modelname + save_name +'.pth')
 	torch.save({'epoch':epoch,
 							'loss':loss,
+							'acc':acc,
 							'model_state_dict':model_dict,
 							'optimizer_state_dict':opt_dict},
 						 model_saved_name)
@@ -118,14 +119,7 @@ def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
 	
 	if debug_mode:
 		print ('- Mean training loss: {:.4f} ; epoch {}'.format(gloss, epoch+1))
-		print ('- Mean training mAP: {:.4f} ; epoch {}'.format(mAP, epoch+1))
-	# if save_model:
-	# 	weights = Model.state_dict()
-	# 	# weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in weights.items()])
-	# 	model_saved_name = os.path.join(model_saved_dir, save_name +'_last.pth')
-	# 	torch.save(weights, model_saved_name)
-	# 	print ('Model {} saved'.format(model_saved_name))
-	
+		print ('- Mean training mAP: {:.4f} ; epoch {}'.format(mAP, epoch+1))	
 	return gloss, mAP
 
 def eval(Model, dataset, collate=None, epoch=0, modal='all',
@@ -150,19 +144,19 @@ def eval(Model, dataset, collate=None, epoch=0, modal='all',
 				sample['joint'] = batch_sample['joint'].float().to(device)
 				sample['bone'] = batch_sample['bone'].float().to(device)
 				output, _ = Model.forward(sample)
-				predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			elif modal == 'pose':
 				sample = (batch_sample['joint'].float().to(device),
 									batch_sample['bone'].float().to(device))
 				output, _ = Model.forward(sample,0)
-				predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			else:
 				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
 				if modal == 'face':
 					output, _ = Model.forward(sample)
-				else:
+				else: # context or body
 					output, _, _ = Model.forward(sample)
-				predictions += [output[i].data.numpy() for i in range(output.shape[0])]
+				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			
 			label = batch_sample['label'].float() # .to(device)
 		
@@ -175,7 +169,6 @@ def eval(Model, dataset, collate=None, epoch=0, modal='all',
 	# predictions = np.asarray(predictions).T
 	# labels = np.asarray(labels).T
 	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
-	
 	return mAP
 
 def train_step(Model, dataset_t, dataset_v, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
@@ -190,16 +183,17 @@ def train_step(Model, dataset_t, dataset_v, Loss, optimizer, collate, epoch, las
 		savemodel(epoch=epoch,
 							model_dict=Model.state_dict(),
 							opt_dict=optimizer.state_dict(),
-							loss=l,
+							loss=l,	acc=a,
 							save_dir=checkpointdir, modelname=model_name, save_name='_best')
 	if (epoch+1) % step2val == 0:
 		l, a = train(Model=Model, dataset=dataset_v, Loss=Loss, optimizer=optimizer, collate=collate,
 									epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
-		val_loss[epoch:epoch+3] = [l]*3
-		val_map[epoch:epoch+3] = [a]*3
+		val_loss[epoch:(epoch+step2val)] = [l]*step2val
+		val_map[epoch:(epoch+step2val)] = [a]*step2val
 	if (epoch+1) % step2save == 0 or (epoch+1) == last_epoch:
 		savemodel(epoch=epoch,
 							model_dict=Model.state_dict(),
 							opt_dict=optimizer.state_dict(),
-							loss=l,
+							loss=l, acc=a,
 							save_dir='Checkpoints', modelname='posedgcnn', save_name='_last')
+	return maxacc
