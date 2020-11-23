@@ -58,14 +58,14 @@ def test_AP(cat_preds, cat_labels, n_classes=8):
 	return ap.mean()
 
 # modal could be: all, pose , context, body, face
-def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
+def train(Model, dataset, Loss, optimizer, bsz=32, collate=None, epoch=0, modal='all',
 				  device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.train()
 	if collate is not None:
-		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0, collate_fn=collate),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, collate_fn=collate),
 									unit='batch')
 	else:
-		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0),
 									unit='batch')
 	loader.set_description("{} Epoch {}".format(dataset.Mode, epoch + 1))
 	loss_values = []
@@ -122,14 +122,14 @@ def train(Model, dataset, Loss, optimizer, collate=None, epoch=0, modal='all',
 		print ('- Mean training mAP: {:.4f} ; epoch {}'.format(mAP, epoch+1))	
 	return gloss, mAP
 
-def eval(Model, dataset, collate=None, epoch=0, modal='all',
+def eval(Model, dataset, bsz=32, collate=None, epoch=0, modal='all',
 				 device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.eval()
 	if collate is not None:
-		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0, collate_fn=collate),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, collate_fn=collate),
 									unit='batch')
 	else:
-		loader = tqdm(DataLoader(dataset, batch_size=32, num_workers=0),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0),
 									unit='batch')
 	loader.set_description("{} Epoch {}".format(dataset.Mode, epoch + 1))
 	predictions, labeles = [], []
