@@ -171,10 +171,10 @@ def eval(Model, dataset, bsz=32, collate=None, epoch=0, modal='all',
 	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
 	return mAP
 
-def train_step(Model, dataset_t, dataset_v, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
+def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
 								train_loss, train_map, val_loss, val_map, maxacc, step2val, step2save, checkpointdir, model_name):
 	
-	l, a = train(Model=Model, dataset=dataset_t, Loss=Loss, optimizer=optimizer,collate=collate,
+	l, a = train(Model=Model, dataset=dataset_t, Loss=Loss, optimizer=optimizer, bsz=bsz, collate=collate,
 								epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
 	train_loss[epoch] = l
 	train_map[epoch] = a
@@ -186,7 +186,7 @@ def train_step(Model, dataset_t, dataset_v, Loss, optimizer, collate, epoch, las
 							loss=l,	acc=a,
 							save_dir=checkpointdir, modelname=model_name, save_name='_best')
 	if (epoch+1) % step2val == 0:
-		l, a = train(Model=Model, dataset=dataset_v, Loss=Loss, optimizer=optimizer, collate=collate,
+		l, a = train(Model=Model, dataset=dataset_v, Loss=Loss, optimizer=optimizer, bsz=bsz, collate=collate,
 									epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
 		val_loss[epoch:(epoch+step2val)] = [l]*step2val
 		val_map[epoch:(epoch+step2val)] = [a]*step2val

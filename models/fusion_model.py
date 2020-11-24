@@ -327,6 +327,18 @@ class MergeClass():
 			return the parameters of merge model
 		'''
 		return self.MergeModel.parameters()
+	
+	def train(self):
+		'''
+			return the parameters of merge model
+		'''
+		self.MergeModel.train()
+	
+	def eval(self):
+		'''
+			return the parameters of merge model
+		'''
+		self.MergeModel.eval()
 
 	def forward(self, data):
 		'''
