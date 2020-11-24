@@ -8,11 +8,12 @@ from itertools import combinations
 class WeightedSum(nn.Module):
 	'''
 	'''
-	def __init__(self, number_modals, stable, outchannels, trainable=False, mode=''):
+	def __init__(self, number_modals, stable, outchannels, trainable=False, mode='', device=torch.device('cpu')):
 		super(WeightedSum, self).__init__()
 		self.NumberModalities = number_modals
 		self.Mode = mode
 		self.Stables = stable
+		self.Device = device
 		self.set_weights(outchannels, trainable)
 
 	def set_weights(self, outchannels, trainable):
@@ -67,12 +68,13 @@ class WeightedSum(nn.Module):
 class EmbraceNet(nn.Module):
 	'''
 	'''
-	def __init__(self, input_size_list=[], embracement_size=32, docker_arch=[]):
+	def __init__(self, input_size_list=[], embracement_size=32, docker_arch=[], device = torch.device('cpu')):
 		super(EmbraceNet, self).__init__()
 
 		self.input_size_list = input_size_list
 		self.embracement_size = embracement_size
 		self.bypass_docking = self.set_dockers(docker_arch)
+		self.Device = device
 
 	def set_dockers(self, docker_architecture=[]):
 		'''
@@ -100,7 +102,7 @@ class EmbraceNet(nn.Module):
 		batch_size = input_list[0].shape[0]
 
 		docking_output_list = []
-		if (self.bypass_docking):
+		if self.bypass_docking:
 			docking_output_list = input_list
 		else:
 			for i, input_data in enumerate(input_list):
@@ -108,22 +110,24 @@ class EmbraceNet(nn.Module):
 				x = nn.functional.relu(x)
 				docking_output_list.append(x)
 		
-		if (availabilities is None):
-			availabilities = torch.ones(batch_size, len(input_list), dtype=torch.float) #, device=self.device)
+		if availabilities is None:
+			availabilities = torch.ones(batch_size, len(input_list), dtype=torch.float, device=self.Device)
 		else:
-			availabilities = availabilities.float()
+			availabilities = availabilities.float().to(self.Device)
 		
-		if (selection_probabilities is None):
-			selection_probabilities = torch.ones(batch_size, len(input_list), dtype=torch.float) #, device=self.device)
+		if selection_probabilities is None:
+			selection_probabilities = torch.ones(batch_size, len(input_list), dtype=torch.float, device=self.Device)
+		else:
+			selection_probabilities = selection_probabilities.float().to(self.Device)
+		
 		selection_probabilities = torch.mul(selection_probabilities, availabilities)
-
 		probability_sum = torch.sum(selection_probabilities, dim=-1, keepdim=True)
 		selection_probabilities = torch.div(selection_probabilities, probability_sum)
 
 		docking_output_stack = torch.stack(docking_output_list, dim=-1)  # [batch_size, embracement_size, num_modalities]
 
 		modality_indices = torch.multinomial(selection_probabilities, num_samples=self.embracement_size, replacement=True)  # [batch_size, embracement_size]
-		modality_toggles = nn.functional.one_hot(modality_indices, num_classes=num_modalities).float()  # [batch_size, embracement_size, num_modalities]
+		modality_toggles = nn.functional.one_hot(modality_indices, num_classes=num_modalities).float().to(self.Device)  # [batch_size, embracement_size, num_modalities]
 
 		embracement_output_stack = torch.mul(docking_output_stack, modality_toggles)
 		embracement_output = torch.sum(embracement_output_stack, dim=-1)  # [batch_size, embracement_size]

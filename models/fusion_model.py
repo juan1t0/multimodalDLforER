@@ -320,7 +320,7 @@ class MergeClass():
 	def forward(self, data):
 		'''
 		'''
-		assert data.shape[0] == 1 # just with batch size of 1
+		assert data['context'].shape[0] == 1 # just with batch size of 1
 		availables = [1.0] *4
 		fb,_,mb = self.Modalities['body'].forward(data['body'])
 		fc,_,mc = self.Modalities['context'].forward(data['context'])
