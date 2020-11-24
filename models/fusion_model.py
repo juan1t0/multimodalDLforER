@@ -11,11 +11,12 @@ class ModelOne(nn.Module):
 		Eembrace net and ocasionaly linear layer
 	'''
 	def __init__(self, num_classes, input_sizes, embrace_size, docker_architecture, finalouts, 
-								use_ll, ll_config, trainable_probs):
+								device, use_ll, ll_config, trainable_probs):
 		super(ModelOne, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = len(input_sizes)
-		self.EmbNet = EmbraceNet(input_sizes, embrace_size, docker_architecture)
+		self.Device = device
+		self.EmbNet = EmbraceNet(input_sizes, embrace_size, docker_architecture, self.Device)
 		self.FinalOut = finalouts
 		self.UseLL = use_ll
 		self.TrainableProbs = trainable_probs
@@ -40,16 +41,16 @@ class ModelOne(nn.Module):
 	
 	def initProbabilities(self):
 		p = torch.ones(1, self.InputSize, dtype=torch.float)
-		self.p = torch.div(p, torch.sum(p, dim=-1, keepdim=True))
+		self.p = torch.div(p, torch.sum(p, dim=-1, keepdim=True)).to(self.Device)
 
 		self.P = nn.Parameter(self.p, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
 		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize, dtype=torch.float) # len(outputs)
+		availabilities = torch.ones(1 , self.InputSize, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] == 0.0 ## review if it works
+				availabilities[0,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities = self.p
@@ -66,11 +67,12 @@ class ModelTwo(nn.Module):
 	'''
 		Two embraces, one after another
 	'''
-	def __init__(self, num_classes, input_sizes, embrace1_param, embrace2_param,
+	def __init__(self, num_classes, input_sizes, embrace1_param, embrace2_param, device,
 								trainable_probs, use_ll1, use_ll2, ll_config1={}, ll_config2={}):
 		super(ModelTwo, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = input_sizes
+		self.Device = device
 		self.EmbNet1 = EmbraceNet(**embrace1_param)
 		self.EmbNet2 = EmbraceNet(**embrace2_param)
 		self.UseLL1 = use_ll1
@@ -99,18 +101,18 @@ class ModelTwo(nn.Module):
 	def initProbabilities(self):
 		p1 = torch.ones(1, self.InputSize, dtype=torch.float)
 		p2 = torch.ones(1, self.InputSize+1, dtype=torch.float)
-		self.p1 = torch.div(p1, torch.sum(p1, dim=-1, keepdim=True))
-		self.p2 = torch.div(p2, torch.sum(p2, dim=-1, keepdim=True))
+		self.p1 = torch.div(p1, torch.sum(p1, dim=-1, keepdim=True)).to(self.Device)
+		self.p2 = torch.div(p2, torch.sum(p2, dim=-1, keepdim=True)).to(self.Device)
 
 		self.P1 = nn.Parameter(self.p1, requires_grad=self.TrainableProbs)
 		self.P2 = nn.Parameter(self.p2, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
 		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize+1, dtype=torch.float) # len(outputs)
+		availabilities = torch.ones(1 , self.InputSize+1, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] == 0.0 ## review if it works
+				availabilities[0,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities1 = self.p1
@@ -130,10 +132,11 @@ class ModelThree(nn.Module):
 		Two embraces plus weigthed sum
 	'''
 	def __init__(self, num_classes, input_sizes, embrace1_param, embrace2_param, wsum_confg,
-								trainable_probs, use_ll1, use_ll2, ll_config1={}, ll_config2={}):
+								device, trainable_probs, use_ll1, use_ll2, ll_config1={}, ll_config2={}):
 		super(ModelThree, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = input_sizes
+		self.Device = device
 		self.EmbNet1 = EmbraceNet(**embrace1_param)
 		self.EmbNet2 = EmbraceNet(**embrace2_param)
 		self.WeightedSum = WeightedSum(**wsum_confg)
@@ -163,18 +166,18 @@ class ModelThree(nn.Module):
 	def initProbabilities(self):
 		p1 = torch.ones(1, self.InputSize, dtype=torch.float)
 		p2 = torch.ones(1, self.InputSize+2, dtype=torch.float)
-		self.p1 = torch.div(p1, torch.sum(p1, dim=-1, keepdim=True))
-		self.p2 = torch.div(p2, torch.sum(p2, dim=-1, keepdim=True))
+		self.p1 = torch.div(p1, torch.sum(p1, dim=-1, keepdim=True)).to(self.Device)
+		self.p2 = torch.div(p2, torch.sum(p2, dim=-1, keepdim=True)).to(self.Device)
 
 		self.P1 = nn.Parameter(self.p1, requires_grad=self.TrainableProbs)
 		self.P2 = nn.Parameter(self.p2, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
 		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize+2, dtype=torch.float) # len(outputs)
+		availabilities = torch.ones(1 , self.InputSize+2, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] == 0.0 ## review if it works
+				availabilities[0,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities1 = self.p1
@@ -182,7 +185,10 @@ class ModelThree(nn.Module):
 		if self.UseLL1:
 			out1 = self.LL1(out1)
 		
-		wsout = self.WeightedSum.forward(outputs2,availabilities[:,:-2])
+		#wsout = self.WeightedSum.forward(outputs2,availabilities[:,:-2])
+		wsout = self.WeightedSum.forward(torch.stack([outputs2[i] for i,a in enumerate(available) if a==1.0],
+                                                 dim=1),
+                                  		availabilities[:,:-2])
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities2 = self.p2
@@ -196,10 +202,11 @@ class ModelFour(nn.Module):
 		Three embraces, two in branches and one for merge all
 	'''
 	def __init__(self, num_classes, input_sizes, embrace1_param, embrace2_param, embrace3_param, wsum_confg,
-								trainable_probs, use_ll, ll_configs):
+								device, trainable_probs, use_ll, ll_configs):
 		super(ModelFour, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = input_sizes
+		self.Device = device
 		self.EmbNet1 = EmbraceNet(**embrace1_param)
 		self.EmbNet2 = EmbraceNet(**embrace2_param)
 		self.EmbNet3 = EmbraceNet(**embrace3_param)
@@ -232,11 +239,11 @@ class ModelFour(nn.Module):
 	
 	def initProbabilities(self):
 		p1 = torch.ones(1, self.InputSize, dtype=torch.float)
-		p2 = torch.ones(1, self.InputSize+2, dtype=torch.float)
-		p3 = torch.ones(1, self.InputSize+2, dtype=torch.float)
-		self.p1 = torch.div(p1, torch.sum(p1, dim=-1, keepdim=True))
-		self.p2 = torch.div(p2, torch.sum(p2, dim=-1, keepdim=True))
-		self.p3 = torch.div(p3, torch.sum(p3, dim=-1, keepdim=True))
+		p2 = torch.ones(1, self.InputSize, dtype=torch.float)
+		p3 = torch.ones(1, self.InputSize+3, dtype=torch.float)
+		self.p1 = torch.div(p1, torch.sum(p1, dim=-1, keepdim=True)).to(self.Device)
+		self.p2 = torch.div(p2, torch.sum(p2, dim=-1, keepdim=True)).to(self.Device)
+		self.p3 = torch.div(p3, torch.sum(p3, dim=-1, keepdim=True)).to(self.Device)
 
 		self.P1 = nn.Parameter(p1,requires_grad=self.TrainableProbs)
 		self.P2 = nn.Parameter(p2,requires_grad=self.TrainableProbs)
@@ -244,10 +251,10 @@ class ModelFour(nn.Module):
 
 	def forward(self, outputs1, outputs2, available):
 		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize+3, dtype=torch.float) # len(outputs)
+		availabilities = torch.ones(1 , self.InputSize+3, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] == 0.0 ## review if it works
+				availabilities[0,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities1 = self.p1
@@ -260,25 +267,28 @@ class ModelFour(nn.Module):
 		if self.UseLL2:
 			out2 = self.LL2(out2)
 
-		wsout = self.WeightedSum.forward(outputs2,availabilities[:,:-3])
+		wsout = self.WeightedSum.forward(torch.stack([outputs2[i] for i,a in enumerate(available) if a==1.0],
+                                                 dim=1),
+                                  		availabilities[:,:-3])
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities3 = self.p3
 		out = self.EmbNet3.forward(outputs2+[out1,out2,wsout], availabilities, probabilities3)
 		if self.UseLL3:
 			out = self.LL3(out)
+		
 		return out, (out1, out2, wsout)
 
 class MergeClass():
 	'''
 		This is a wrapper class of the real merge trainable class
 	'''
-	def __init__(self, models={}, config={}, # mode='train', # review if dictionay is better than list <memory, vel,etc>
+	def __init__(self, models={}, config={}, device=torch.device('cpu'), # mode='train', # review if dictionay is better than list <memory, vel,etc>
 								labels={}, self_embeding=False,debug_mode=False):
 		'''
-			- models				: dictionary with the d-models already loaded
+			- models				: dictionary with the d-models already loaded and in eval mode
 			- config				: dictionary whit the parameters for define the merge module
-			- mode					: using mode, can be 'train', 'test' or 'predic'
+			- device				: torch device
 			- dataset				: Dataset already loaded with all data
 			- labels				: dictionary with the labels used
 			- self_embeding	: boolean, if true the embeding heuristic is used
@@ -287,6 +297,7 @@ class MergeClass():
 		'''
 		self.Modalities = models
 		self.MergeConfig = config
+		self.Device = device
 		self.MergeModel = self.get_model(self.MergeConfig)
 		# self.Mode = mode
 		self.Classes = labels
@@ -301,13 +312,13 @@ class MergeClass():
 		type = config['type']
 		# self.build_transform(type)
 		if type == 1:
-			return ModelOne(**config['parameters'])
+			return ModelOne(**config['parameters']).to(self.Device)
 		elif type == 2:
-			return ModelTwo(**config['parameters'])
+			return ModelTwo(**config['parameters']).to(self.Device)
 		if type == 3:
-			return ModelThree(**config['parameters'])
+			return ModelThree(**config['parameters']).to(self.Device)
 		elif type == 4:
-			return ModelFour(**config['parameters'])
+			return ModelFour(**config['parameters']).to(self.Device)
 		else:
 			raise NameError('type {} is not supported yet'.format(type))
 	

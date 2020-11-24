@@ -36,7 +36,7 @@ class WeightedSum(nn.Module):
 		elif self.Mode == 'tensor':
 			for i,ws in enumerate(w_inputs): ## review if works
 				tt = torch.ones(len(ws), 1, dtype=torch.float)
-				tt = torch.div(tt, torch.sum(tt, dim=0, keepdim=True))
+				tt = torch.div(tt, torch.sum(tt, dim=0, keepdim=True)).to(self.Device)
 				setattr(self, 'Weight_%d'%(i),nn.Parameter(tt, requires_grad=trainable))
 		
 		else:
@@ -45,25 +45,28 @@ class WeightedSum(nn.Module):
 	def forward(self, outs, availability):
 		'''
 		'''
-		availability = torch.where(availability != 0)[0]
+		availability = torch.where(availability != 0)[1]
+		ava_id = -1 # len(self.WeightsAbi)-1
 		for i, a in enumerate(self.WeightsAbi):
-			a = torch.tensor(a)
+			a = torch.tensor(a,dtype=torch.float, device=self.Device)
 			if a.shape != availability.shape:
 					continue
 			if torch.all(availability.eq(a)):
 					ava_id = i
 					break
+		if ava_id == -1:
+			raise ValueError('Not match the weights')
 		W = getattr(self,'Weight_%d'%(ava_id))#self.Weights[availability]
 		if self.Mode == 'convs':
 			out = W(outs)
 		elif self.Mode == 'tensor': ### review how make it works as i like
-			b, c, n = outs.shape
-			out = torch.zeros(b, 1, n)
+			b, _, n = outs.shape
+			out = torch.zeros(b, 1, n, dtype=torch.float, device=self.Device)
 			for i, o in enumerate(outs):
 				out[i,:,:] = (torch.mm(o.T, W)).T
 		else:
 			raise NameError('{} is not supported yet'.format(self.Mode))
-		return out
+		return out.view(out.shape[0],out.shape[-1])
 
 class EmbraceNet(nn.Module):
 	'''
@@ -127,7 +130,7 @@ class EmbraceNet(nn.Module):
 		docking_output_stack = torch.stack(docking_output_list, dim=-1)  # [batch_size, embracement_size, num_modalities]
 
 		modality_indices = torch.multinomial(selection_probabilities, num_samples=self.embracement_size, replacement=True)  # [batch_size, embracement_size]
-		modality_toggles = nn.functional.one_hot(modality_indices, num_classes=num_modalities).float().to(self.Device)  # [batch_size, embracement_size, num_modalities]
+		modality_toggles = nn.functional.one_hot(modality_indices, num_classes=num_modalities).float() # [batch_size, embracement_size, num_modalities]
 
 		embracement_output_stack = torch.mul(docking_output_stack, modality_toggles)
 		embracement_output = torch.sum(embracement_output_stack, dim=-1)  # [batch_size, embracement_size]
