@@ -46,14 +46,14 @@ class ModelOne(nn.Module):
 		self.P = nn.Parameter(self.p, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
-		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize, dtype=torch.float, device=self.Device) # len(outputs)
+		batch_size = outputs1[0].shape[0]
+		availabilities = torch.ones(batch_size , self.InputSize, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] = 0.0 ## review if it works
+				availabilities[:,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities = self.p
+		probabilities = torch.stack([p]*batch_size, dim=0).view(batch_size, self.InputSize)
 		if self.FinalOut:
 			out = self.EmbNet.forward(outputs2, availabilities, probabilities)
 		else:
@@ -323,27 +323,23 @@ class MergeClass():
 			raise NameError('type {} is not supported yet'.format(type))
 	
 	def parameters(self):
-		'''
-			return the parameters of merge model
-		'''
 		return self.MergeModel.parameters()
 	
 	def train(self):
-		'''
-			return the parameters of merge model
-		'''
 		self.MergeModel.train()
 	
 	def eval(self):
-		'''
-			return the parameters of merge model
-		'''
 		self.MergeModel.eval()
+	
+	def state_dict(self):
+		return self.MergeModel.state_dict()
+	def load_state_dict(self, dict):
+		self.MErgeModel.load_state_dict(dict)
 
 	def forward(self, data):
 		'''
 		'''
-		assert data['context'].shape[0] == 1 # just with batch size of 1
+		#assert data['context'].shape[0] == 1
 		availables = [1.0] *4
 		fb,_,mb = self.Modalities['body'].forward(data['body'])
 		fc,_,mc = self.Modalities['context'].forward(data['context'])
