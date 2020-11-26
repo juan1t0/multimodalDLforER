@@ -162,7 +162,7 @@ class Emotic_MultiDB(Dataset):
 		if self.Transform:
 			sample = self.Transform(sample)
 
-		if self.ReviewMiss(sample):
+		if self.ReviewMissing(sample):
 			return None
 		
 		return sample

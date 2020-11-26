@@ -25,9 +25,9 @@ Merge_2_configures ={
 			'device': torch.device('cuda'),
 		},
 		'embrace2_param': {
-			'input_size_list': [8, 8, 8, 8, ],
+			'input_size_list': [8, 8, 8, 8, 8, ],
 			'embracement_size': 8,
-			'docker_arch': [[16, 8], [16, 8], [16, 8], [16, 8],],
+			'docker_arch': [[16, 8], [16, 8], [16, 8], [16, 8], [16, 8],],
 			'device': torch.device('cuda'),
 		},
 		'device': torch.device('cuda'),
