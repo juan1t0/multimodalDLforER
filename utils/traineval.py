@@ -179,14 +179,14 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 		print ('- Mean validation mAP: {:.4f} ; epoch {}'.format(val_mAP, epoch+1))
 	return train_gloss, train_mAP, val_gloss, val_mAP
 
-def eval(Model, dataset, bsz=32, train_sampler=None, val_sampler=None, collate=None, epoch=0, modal='all',
+def eval(Model, dataset, bsz=32, test_sampler=None, collate=None, epoch=0, modal='all',
 				 device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.eval()
 	if collate is not None:
-		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, sampler=train_sampler, collate_fn=collate),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, sampler=test_sampler, collate_fn=collate),
 									unit='batch')
 	else:
-		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, sampler=train_sampler),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, sampler=test_sampler),
 									unit='batch')
 	loader.set_description("{} Epoch {}".format(dataset.Mode, epoch + 1))
 	predictions, labeles = [], []

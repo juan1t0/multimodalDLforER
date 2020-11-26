@@ -51,7 +51,7 @@ class Emotic_MultiDB(Dataset):
 	def __init__ (self, root_dir='Emotic_MDB', annotation_dir='annotations', mode='train',
 								modality='all',
 								#missin='',
-								takeone=False, modals_dirs=[], 
+								takeone=False, modals_dirs=[],
 							 	categories=[], continuous=[], transform=None):
 
 		super(Emotic_MultiDB, self).__init__()
@@ -172,12 +172,12 @@ class Emotic_MultiDB(Dataset):
 					if cct in curr_categories:
 						lbl[i] = 1.0
 						if self.TakeOne:
-							return lbl
+							return np.argmax(lbl)[0]
 				continue
 			if ct in curr_categories:
 				lbl[i] = 1.0
 				if self.TakeOne:
-					return lbl
+					return np.argmax(lbl)[0]
 		
 		return lbl
 
@@ -273,7 +273,6 @@ class RandomCrop(object):
 							left_f: left_f + new_wf]
 
 		return {'label': lbl, 'context': ctx, 'body': bod, 'face': fac, 'joint': joi, 'bone': bon}
-
 
 class ToTensor(object):
 	def __call__(self, sample):
