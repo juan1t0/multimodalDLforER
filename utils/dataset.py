@@ -6,6 +6,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset#, DataLoader
 from torch.utils.data.dataloader import default_collate
+from torchvision import transforms, utils
 
 '''
 	revisar todo / comentar
@@ -47,25 +48,18 @@ newlabeles = {'len':8,
               }
 
 class Emotic_MultiDB(Dataset):
-	# This Dataset provide the process adecuated input for MER
-	def __init__ (self,
-								root_dir='Emotic_MDB',
-								annotation_dir='annotations',
-								mode='train',
+	def __init__ (self, root_dir='Emotic_MDB', annotation_dir='annotations', mode='train',
 								modality='all',
-								missin='',
-								takeone=False,
-								modals_dirs=[],
-								categories=[],
-								continuous=[],
-								transform=None):
+								#missin='',
+								takeone=False, modals_dirs=[], 
+							 	categories=[], continuous=[], transform=None):
 
 		super(Emotic_MultiDB, self).__init__()
 		self.RootDir = root_dir
 		self.Mode = mode
 		self.AnnotationDir = os.path.join(root_dir, annotation_dir)
 		self.Modality = modality
-		self.Missing = missin
+		# self.Missing = missin
 		self.TakeOne = takeone
 		self.Categories = categories
 		self.Continuous = continuous
@@ -93,44 +87,44 @@ class Emotic_MultiDB(Dataset):
 		self.NewLabel = newlabels
 		self.Categories = list(newlabels['cat'].keys())
 
-	def resizeFace(self, newsize):
-		self.Resize_Face = newsize
-	
-	def ReviewMissing(self, sample):
-		# ctx_sum = np.sum(sample['context'])
-		# bdy_sum = np.sum(sample['body'])
-		fce_sum = np.sum(sample['face'],dtype=np.float_)
-		pos_sum = np.sum(sample['joint'],dtype=np.float_)
-
-		skip = True
-		if self.Missing == 'none' and (fce_sum == 0.0 or pos_sum == 0.0): # none should be missing (1111)
-			skip = True
-		elif self.Missing == 'face' and (fce_sum == 0.0 and pos_sum != 0.0): # face should be missing (1101)
-			skip = False
-		elif self.Missing == 'pose' and (fce_sum != 0.0 and pos_sum == 0.0): # pose should be missing (1110)
-			skip = False
-		elif self.Missing == 'both' and (fce_sum == 0.0 and pos_sum == 0.0): # both should be missing (1100)
-			skip = False
-		elif self.Missing == '':
-			skip = False
-
-		return skip
+	# def ReviewMissing(self, sample):
+	# 	# ctx_sum = np.sum(sample['context'])
+	# 	# bdy_sum = np.sum(sample['body'])
+	# 	fce_sum = np.sum(sample['face'],dtype=np.float_)
+	# 	pos_sum = np.sum(sample['joint'],dtype=np.float_)
+	# 	skip = True
+	# 	if self.Missing == 'none' and (fce_sum != 0.0 and pos_sum != 0.0): # none should be missing (1111)
+	# 		skip = False
+	# 	elif self.Missing == 'face' and (fce_sum == 0.0 and pos_sum != 0.0): # face should be missing (1101)
+	# 		skip = False
+	# 	elif self.Missing == 'pose' and (fce_sum != 0.0 and pos_sum == 0.0): # pose should be missing (1110)
+	# 		skip = False
+	# 	elif self.Missing == 'both' and (fce_sum == 0.0 and pos_sum == 0.0): # both should be missing (1100)
+	# 		skip = False
+	# 	elif self.Missing == '':
+	# 		skip = False
+	# 	return skip
 
 	def __getitem__(self, idx):
 		if torch.is_tensor(idx):
 			 idx = idx.tolist()
 		
+		if self.Modality == 'label':
+			if len(self.Continuous)==0:
+				nplbl = self.getlabel(self.Annotations.iloc[idx,0])
+			else:
+				nplbl = self.getlabel(self.Annotations.iloc[idx,1])
+			return {'label': nplbl}
+
 		ctx_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 2],self.Annotations.iloc[idx, 3])
 		npctx = np.load(ctx_dir)
 	
 		bod_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 4],self.Annotations.iloc[idx, 5])
-		npbod = cv2.resize(np.load(bod_dir),(224,224))
+		npbod = np.load(bod_dir)
 		
 		if isinstance(self.Annotations.iloc[idx, 7], str): # there are face
 			fac_dir = os.path.join(self.RootDir, self.Annotations.iloc[idx, 6],self.Annotations.iloc[idx, 7])
 			npfac = np.load(fac_dir)
-			if self.Resize_Face is not None:
-				npfac = cv2.resize(npfac, self.Resize_Face)
 		else:
 			if self.Modality == 'face': # there are not face, but it is required
 				return None
@@ -161,10 +155,8 @@ class Emotic_MultiDB(Dataset):
 		
 		if self.Transform:
 			sample = self.Transform(sample)
-
-		if self.ReviewMissing(sample):
-			return None
-		
+		# if self.ReviewMissing(sample):
+		# 	return None
 		return sample
 	
 	def getlabel(self, categories):
@@ -189,117 +181,116 @@ class Emotic_MultiDB(Dataset):
 		
 		return lbl
 
-class Emotic_MDB(Dataset):
-	# This Dataset provide the process adecuated input for MER
-	def __init__ (self,
-								root_dir='/Emotic_MDB',
-								annotation_dir='/annotations',
-								mode='train',
-								modals_names=[],
-								categories=[],
-								transform=None):
+class Rescale(object):
+	def __init__(self, context_output_size, body_output_size, face_output_size):
+		assert isinstance(context_output_size, (int, tuple))
+		assert isinstance(body_output_size, (int, tuple))
+		assert isinstance(face_output_size, (int, tuple))
 
-		super(Emotic_MDB, self).__init__()
-		self.RootDir = root_dir
-		self.Mode = mode
-		self.AnnotationsDir = root_dir + annotation_dir + '/' + mode
-		self.ModalsNames = modals_names
-		self.Categories = categories
-		self.Transform = transform
-		self.loadData()
+		if isinstance(context_output_size, int):
+			self.ContextOutputSize = (context_output_size, context_output_size)
+		else:
+			assert len(context_output_size) == 2
+			self.ContextOutputSize = context_output_size
+		if isinstance(body_output_size, int):
+			self.BodyOutputSize = (body_output_size, body_output_size)
+		else:
+			assert len(body_output_size) == 2
+			self.BodyOutputSize = body_output_size
+		if isinstance(face_output_size, int):
+			self.FaceOutputSize = (face_output_size, face_output_size)
+		else:
+			assert len(face_output_size) == 2
+			self.FaceOutputSize = face_output_size
 
-	def loadData(self):
-		annlist = os.listdir(self.AnnotationsDir)
-		la = {}
-		for nm in annlist:
-			k = nm[:-4]
-			la[k]= pd.read_csv(self.AnnotationsDir + '/'+nm)
-		self.Annotations = la
-		md = []
-		for nm in self.ModalsNames:
-			md.append(self.RootDir+'/'+self.Mode + '/' + nm + '/')
-		self.ModalsDirs = md
+	def __call__(self, sample):
+		lbl = sample['label']
+		ctx = sample['context']
+		bod = sample['body']
+		fac = sample['face']
+		joi = sample['joint']
+		bon = sample['bone']
 
-	def __len__(self):
-		return len(self.Annotations[0])
+		new_ch, new_cw = self.ContextOutputSize
+		new_bh, new_bw = self.BodyOutputSize
+		new_fh, new_fw = self.FaceOutputSize
 
-	def __getitem__(self, idx):
-		if torch.is_tensor(idx):
-			 idx = idx.tolist()
-    
-		flm_dir = self.Annotations['face_landmarks'].iloc[idx, 1] + self.Annotations['face_landmarks'].iloc[idx, 0]
-		sklj_dir = self.Annotations['skeleton'].iloc[idx, 1] + self.Annotations['skeleton'].iloc[idx, 0]
-		sklb_dir = self.Annotations['skeleton'].iloc[idx, 3] + self.Annotations['skeleton'].iloc[idx, 2]
-		ctx_dir = self.Annotations['context_blur'].iloc[idx, 1] + self.Annotations['context_blur'].iloc[idx, 0]
+		ctx = cv2.resize(ctx, (new_ch, new_cw))
+		bod = cv2.resize(bod, (new_bh, new_bw))
+		fac = cv2.resize(fac, (new_fh, new_fw))
 
-		flm = np.load(flm_dir)
-		skl_j = np.load(sklj_dir)
-		skl_b = np.load(sklb_dir)
-		ctx = np.load(ctx_dir)
-		
-		lbl = self.getlabel(self.Annotations['context_blur'].iloc[idx,2])
+		return {'label': lbl, 'context': ctx, 'body': bod, 'face': fac, 'joint': joi, 'bone': bon}
 
-		sample = {'label': lbl,
-			'face_landmarks': flm[:,None],
-			'skeleton_joints': skl_j,
-			'skeleton_bones': skl_b,
-			'context': ctx}
-		
-		if self.Transform:
-			sample = self.Transform(sample)
+class RandomCrop(object):
+	def __init__(self, context_output_size, body_output_size, face_output_size):
+		assert isinstance(context_output_size, (int, tuple))
+		assert isinstance(body_output_size, (int, tuple))
+		assert isinstance(face_output_size, (int, tuple))
 
-		return sample
-	
-	def getlabel(self, categories):
-		curr_categories = [ct[1:-1].replace('\'','') for ct in (categories[1:-1]).split(',')]
-		
-		lbl = np.zeros(len(self.Categories))
-		for i, ct in enumerate(self.Categories):
-			if ct in curr_categories:
-				lbl[i] = 1.0
-		return lbl
+		if isinstance(context_output_size, int):
+			self.ContextOutputSize = (context_output_size, context_output_size)
+		else:
+			assert len(context_output_size) == 2
+			self.ContextOutputSize = context_output_size
+		if isinstance(body_output_size, int):
+			self.BodyOutputSize = (body_output_size, body_output_size)
+		else:
+			assert len(body_output_size) == 2
+			self.BodyOutputSize = body_output_size
+		if isinstance(face_output_size, int):
+			self.FaceOutputSize = (face_output_size, face_output_size)
+		else:
+			assert len(face_output_size) == 2
+			self.FaceOutputSize = face_output_size
+
+	def __call__(self, sample):
+		lbl = sample['label']
+		ctx = sample['context']
+		bod = sample['body']
+		fac = sample['face']
+		joi = sample['joint']
+		bon = sample['bone']
+
+		hc, wc = ctx.shape[:2]
+		new_hc, new_wc = self.ContextOutputSize
+		hb, wb = bod.shape[:2]
+		new_hb, new_wb = self.BodyOutputSize
+		hf, wf = fac.shape[:2]
+		new_hf, new_wf = self.FaceOutputSize
+
+		top_c = np.random.randint(0, hc - new_hc)
+		left_c = np.random.randint(0, wc - new_wc)
+		top_b = np.random.randint(0, hb - new_hb)
+		left_b = np.random.randint(0, wb - new_wb)
+		top_f = np.random.randint(0, hf - new_hf)
+		left_f = np.random.randint(0, wf - new_wf)
+
+		ctx = ctx[top_c: top_c + new_hc,
+							left_c: left_c + new_wc]
+		bod = bod[top_b: top_b + new_hb,
+							left_b: left_b + new_wb]
+		fac = fac[top_f: top_f + new_hf,
+							left_f: left_f + new_wf]
+
+		return {'label': lbl, 'context': ctx, 'body': bod, 'face': fac, 'joint': joi, 'bone': bon}
 
 
-class Emotic_PP(Dataset):
-	# This Dataset provide the original images and
-	def __init__(self,
-							 root_dir='/emotic',
-							 annotations_dir='/annotaions',
-							 mode='train',
-							 transform = None):
-		super(Emotic_PP, self).__init__()
-		self.RootDir = root_dir
-		self.Annotations = pd.read_csv(annotations_dir +'/'+ mode +'.csv')
-		self.Mode = mode
-		self.Transform = transform
-	
-	def __len__(self):
-		return len(self.Annotations)
-	
-	def __getitem__(self, idx):
-		if torch.is_tensor(idx):
-			 idx = idx.tolist()
-		
-		img_folder = self.RootDir +'/'+ self.Annotations.iloc[idx,1] +'/'
-		img_file = self.Annotations.iloc[idx,2]
-		img = cv2.imread(img_folder + img_file)
+class ToTensor(object):
+	def __call__(self, sample):
+		lbl = sample['label']
+		ctx = sample['context']
+		bod = sample['body']
+		fac = sample['face']
+		joi = sample['joint']
+		bon = sample['bone']
 
-		person_folder = (self.RootDir +'/'+ self.Annotations.iloc[idx,1]).replace('images','persons') +'/'
-		person_file = self.Mode + '_person_'+str(idx)+'.jpg'
-		person = cv2.imread(person_folder + person_file)
-		
-		label = self.Annotations.iloc[idx,5]
-		bbox = self.Annotations.iloc[idx,4]
+		ctx = ctx.transpose((2, 0, 1))
+		bod = bod.transpose((2, 0, 1))
+		fac = fac.transpose((2, 0, 1))
 
-		sample = {'label': label,
-							'imagen': img,
-							'person': person,
-							'bounding_box': bbox,
-							'image_filename': img_file, 
-							'person_filename': person_file,
-							'folder': self.Annotations.iloc[idx,1]}
-
-		if self.Transform:
-			sample = self.Transform(sample)
-
-		return sample
+		return {'label': torch.from_numpy(lbl).float(),
+						 'context': torch.from_numpy(ctx).float(),
+						 'body': torch.from_numpy(bod).float(),
+						 'face': torch.from_numpy(fac).float(),
+						 'joint': torch.from_numpy(joi).float(),
+						 'bone': torch.from_numpy(bon).float()}

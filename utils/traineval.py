@@ -60,14 +60,15 @@ def test_AP(cat_preds, cat_labels, n_classes=8):
 	return ap.mean()
 
 # modal could be: all, pose , context, body, face
-def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32, collate=None, epoch=0, modal='all',
-				  device=torch.device('cpu'), debug_mode=False, tqdm=None):
+def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
+					collate=None, train_sampler=None, val_sampler=None, epoch=0,
+					modal='all', device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.train()
 	if collate is not None:
-		loader = tqdm(DataLoader(train_dataset, batch_size=bsz, num_workers=0, collate_fn=collate),
+		loader = tqdm(DataLoader(train_dataset, batch_size=bsz, num_workers=0, sampler=train_sampler, collate_fn=collate),
 									unit='batch')
 	else:
-		loader = tqdm(DataLoader(train_dataset, batch_size=bsz, num_workers=0),
+		loader = tqdm(DataLoader(train_dataset, batch_size=bsz, num_workers=0, sampler=train_sampler,),
 									unit='batch')
 	loader.set_description("{} Epoch {}".format(train_dataset.Mode, epoch + 1))
 	loss_values = []
@@ -76,18 +77,18 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32, collate=No
 		with torch.no_grad():
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].float().permute(0,3,1,2).to(device)
-				sample['body'] = batch_sample['body'].float().permute(0,3,1,2).to(device)
-				sample['face'] = batch_sample['face'].float().permute(0,3,1,2).to(device)
-				sample['joint'] = batch_sample['joint'].float().to(device)
-				sample['bone'] = batch_sample['bone'].float().to(device)
+				sample['context'] = batch_sample['context'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['body'] = batch_sample['body'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['face'] = batch_sample['face'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['joint'] = batch_sample['joint'].to(device)#.float().to(device)
+				sample['bone'] = batch_sample['bone'].to(device)#.float().to(device)
 			elif modal == 'pose':
-				sample = (batch_sample['joint'].float().to(device),
-									batch_sample['bone'].float().to(device))
+				sample = (batch_sample['joint'].to(device),#.float().to(device),
+									batch_sample['bone'].to(device))#.float().to(device))
 			else:
-				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
+				sample = batch_sample[modal].to(device)#.float().permute(0,3,1,2).to(device)
 			
-			label = batch_sample['label'].float().to(device)
+			label = batch_sample['label'].to(device)#.float().to(device)
 
 		optimizer.zero_grad()
 		if modal =='pose':
@@ -120,10 +121,10 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32, collate=No
 	train_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
 
 	if collate is not None:
-		loader = tqdm(DataLoader(val_dataset, batch_size=bsz, num_workers=0, collate_fn=collate),
+		loader = tqdm(DataLoader(val_dataset, batch_size=bsz, num_workers=0, sampler=val_sampler, collate_fn=collate),
 									unit='batch')
 	else:
-		loader = tqdm(DataLoader(val_dataset, batch_size=bsz, num_workers=0),
+		loader = tqdm(DataLoader(val_dataset, batch_size=bsz, num_workers=0, sampler=val_sampler,),
 									unit='batch')
 	loader.set_description("{} Epoch {}".format(val_dataset.Mode, epoch + 1))
 	loss_values = []
@@ -134,18 +135,18 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32, collate=No
 		for batch_idx, batch_sample in enumerate(loader):
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].float().permute(0,3,1,2).to(device)
-				sample['body'] = batch_sample['body'].float().permute(0,3,1,2).to(device)
-				sample['face'] = batch_sample['face'].float().permute(0,3,1,2).to(device)
-				sample['joint'] = batch_sample['joint'].float().to(device)
-				sample['bone'] = batch_sample['bone'].float().to(device)
+				sample['context'] = batch_sample['context'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['body'] = batch_sample['body'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['face'] = batch_sample['face'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['joint'] = batch_sample['joint'].to(device)#.float().to(device)
+				sample['bone'] = batch_sample['bone'].to(device)#.float().to(device)
 			elif modal == 'pose':
-				sample = (batch_sample['joint'].float().to(device),
-									batch_sample['bone'].float().to(device))
+				sample = (batch_sample['joint'].to(device),#.float().to(device),
+									batch_sample['bone'].to(device))#.float().to(device))
 			else:
-				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
+				sample = batch_sample[modal].to(device)#.float().permute(0,3,1,2).to(device)
 
-			label = batch_sample['label'].float().to(device)
+			label = batch_sample['label'].to(device)#.float().to(device)
 
 			if modal =='pose':
 				output, _ = Model.forward(sample, 0)
@@ -178,14 +179,14 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32, collate=No
 		print ('- Mean validation mAP: {:.4f} ; epoch {}'.format(val_mAP, epoch+1))
 	return train_gloss, train_mAP, val_gloss, val_mAP
 
-def eval(Model, dataset, bsz=32, collate=None, epoch=0, modal='all',
+def eval(Model, dataset, bsz=32, train_sampler=None, val_sampler=None, collate=None, epoch=0, modal='all',
 				 device=torch.device('cpu'), debug_mode=False, tqdm=None):
 	Model.eval()
 	if collate is not None:
-		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, collate_fn=collate),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, sampler=train_sampler, collate_fn=collate),
 									unit='batch')
 	else:
-		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0),
+		loader = tqdm(DataLoader(dataset, batch_size=bsz, num_workers=0, sampler=train_sampler),
 									unit='batch')
 	loader.set_description("{} Epoch {}".format(dataset.Mode, epoch + 1))
 	predictions, labeles = [], []
@@ -194,27 +195,27 @@ def eval(Model, dataset, bsz=32, collate=None, epoch=0, modal='all',
 		with torch.no_grad():
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].float().permute(0,3,1,2).to(device)
-				sample['body'] = batch_sample['body'].float().permute(0,3,1,2).to(device)
-				sample['face'] = batch_sample['face'].float().permute(0,3,1,2).to(device)
-				sample['joint'] = batch_sample['joint'].float().to(device)
-				sample['bone'] = batch_sample['bone'].float().to(device)
+				sample['context'] = batch_sample['context'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['body'] = batch_sample['body'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['face'] = batch_sample['face'].to(device)#.float().permute(0,3,1,2).to(device)
+				sample['joint'] = batch_sample['joint'].to(device)#.float().to(device)
+				sample['bone'] = batch_sample['bone'].to(device)#.float().to(device)
 				output, _ = Model.forward(sample)
 				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			elif modal == 'pose':
-				sample = (batch_sample['joint'].float().to(device),
-									batch_sample['bone'].float().to(device))
+				sample = (batch_sample['joint'].to(device),#.float().to(device),
+									batch_sample['bone'].to(device))#.float().to(device))
 				output, _ = Model.forward(sample,0)
 				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			else:
-				sample = batch_sample[modal].float().permute(0,3,1,2).to(device)
+				sample = batch_sample[modal].to(device)#.float().permute(0,3,1,2).to(device)
 				if modal == 'face':
 					output, _ = Model.forward(sample)
 				else: # context or body
 					output, _, _ = Model.forward(sample)
 				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			
-			label = batch_sample['label'].float() # .to(device)
+			label = batch_sample['label']# .float() # .to(device)
 		
 		labeles += [label[i].data.numpy() for i in range(label.shape[0])]
 		# predictions[(batch_idx*32):(batch_idx*32 +32),:] = output.to('cpu').data.numpy()
@@ -227,11 +228,14 @@ def eval(Model, dataset, bsz=32, collate=None, epoch=0, modal='all',
 	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
 	return mAP
 
-def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch, last_epoch, modal, device, debug_mode, tqdm,
-								train_loss, train_map, val_loss, val_map, maxacc, step2val, step2save, checkpointdir, model_name):
+def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch,
+								tsampler, vsampler,
+								last_epoch, modal, device, debug_mode, tqdm, train_loss, train_map,
+								val_loss, val_map, maxacc, step2val, step2save, checkpointdir, model_name):
 	
 	tl, ta, vl, va = train(Model=Model, train_dataset=dataset_t, Loss=Loss, optimizer=optimizer,
-													val_dataset=dataset_v , bsz=bsz, collate=collate, epoch=epoch, modal=modal,
+													val_dataset=dataset_v , bsz=bsz, collate=collate, train_sampler=tsampler,
+													val_sampler=vsampler,epoch=epoch, modal=modal,
 													device=device, debug_mode=debug_mode, tqdm=tqdm)
 	train_loss[epoch] = tl
 	train_map[epoch] = ta
