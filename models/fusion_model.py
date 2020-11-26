@@ -53,7 +53,7 @@ class ModelOne(nn.Module):
 				availabilities[:,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities = torch.stack([p]*batch_size, dim=0).view(batch_size, self.InputSize)
+		probabilities = torch.stack([self.p]*batch_size, dim=0).view(batch_size, self.InputSize)
 		if self.FinalOut:
 			out = self.EmbNet.forward(outputs2, availabilities, probabilities)
 		else:
@@ -108,20 +108,20 @@ class ModelTwo(nn.Module):
 		self.P2 = nn.Parameter(self.p2, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
-		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize+1, dtype=torch.float, device=self.Device) # len(outputs)
+		batch_size = outputs1[0].shape[0]
+		availabilities = torch.ones(batch_size , self.InputSize+1, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] = 0.0 ## review if it works
+				availabilities[:,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities1 = self.p1
+		probabilities1 = torch.stack([self.p1]*batch_size,dim=0).view(batch_size, self.InputSize)
 		out1 = self.EmbNet1.forward(outputs1, availabilities[:,:-1], probabilities1)#availabilities without last column
 		if self.UseLL1:
 			out1 = self.LL1(out1)
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities2 = self.p2
+		probabilities2 = torch.stack([self.p2]*batch_size, dim=0).view(batch_size, self.InputSize +1)
 		out = self.EmbNet2.forward(outputs2+[out1], availabilities, probabilities2)
 		if self.UseLL2:
 			out = self.LL2(out)
@@ -173,14 +173,14 @@ class ModelThree(nn.Module):
 		self.P2 = nn.Parameter(self.p2, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
-		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize+2, dtype=torch.float, device=self.Device) # len(outputs)
+		batch_size = outputs1[0].shape[0]
+		availabilities = torch.ones(batch_size , self.InputSize +2, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] = 0.0 ## review if it works
+				availabilities[:,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities1 = self.p1
+		probabilities1 = torch.stack([self.p1]*batch_size, dim=0).view(batch_size, self.InputSize)
 		out1 = self.EmbNet1.forward(outputs1, availabilities[:,:-2], probabilities1)#availabilities without last column
 		if self.UseLL1:
 			out1 = self.LL1(out1)
@@ -191,7 +191,7 @@ class ModelThree(nn.Module):
                                   		availabilities[:,:-2])
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities2 = self.p2
+		probabilities2 = torch.stack([self.p2]*batch_size, dim=0).view(batch_size, self.InputSize +2)
 		out = self.EmbNet2.forward(outputs2+[out1,wsout], availabilities, probabilities2)
 		if self.UseLL2:
 			out = self.LL2(out)
@@ -250,20 +250,20 @@ class ModelFour(nn.Module):
 		self.P3 = nn.Parameter(p3, requires_grad=self.TrainableProbs)
 
 	def forward(self, outputs1, outputs2, available):
-		# batch_size = outputs[0][0].shape[0]
-		availabilities = torch.ones(1 , self.InputSize+3, dtype=torch.float, device=self.Device) # len(outputs)
+		batch_size = outputs1[0].shape[0]
+		availabilities = torch.ones(batch_size , self.InputSize+3, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
-				availabilities[0,i] = 0.0 ## review if it works
+				availabilities[:,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities1 = self.p1
+		probabilities1 = torch.stack([self.p1]*batch_size,dim=0).view(batch_size, self.InputSize)
 		out1 = self.EmbNet1.forward(outputs1, availabilities[:,:-3], probabilities1)#availabilities without last column
 		if self.UseLL1:
 			out1 = self.LL1(out1)
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities2 = self.p2
-		out2 = self.EmbNet2.forward(outputs1, availabilities[:,:-3], probabilities2)#availabilities without last column
+		probabilities2 = torch.stack([self.p2]*batch_size,dim=0).view(batch_size, self.InputSize)
+		out2 = self.EmbNet2.forward(outputs2, availabilities[:,:-3], probabilities2)#availabilities without last column
 		if self.UseLL2:
 			out2 = self.LL2(out2)
 
@@ -272,7 +272,7 @@ class ModelFour(nn.Module):
                                   		availabilities[:,:-3])
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
-		probabilities3 = self.p3
+		probabilities3 = torch.stack([self.p3]*batch_size, dim=0).view(batch_size, self.InputSize +3)
 		out = self.EmbNet3.forward(outputs2+[out1,out2,wsout], availabilities, probabilities3)
 		if self.UseLL3:
 			out = self.LL3(out)

@@ -45,10 +45,12 @@ class WeightedSum(nn.Module):
 	def forward(self, outs, availability):
 		'''
 		'''
-		availability = torch.where(availability != 0)[1]
+		b, c, n = outs.shape
+		availability = availability[0]
+		availability = torch.where(availability != 0)[0]
 		ava_id = -1 # len(self.WeightsAbi)-1
 		for i, a in enumerate(self.WeightsAbi):
-			a = torch.tensor(a,dtype=torch.float, device=self.Device)
+			a = torch.tensor(a,dtype=availability.dtype, device=self.Device)
 			if a.shape != availability.shape:
 					continue
 			if torch.all(availability.eq(a)):
@@ -60,7 +62,6 @@ class WeightedSum(nn.Module):
 		if self.Mode == 'convs':
 			out = W(outs)
 		elif self.Mode == 'tensor': ### review how make it works as i like
-			b, _, n = outs.shape
 			out = torch.zeros(b, 1, n, dtype=torch.float, device=self.Device)
 			for i, o in enumerate(outs):
 				out[i,:,:] = (torch.mm(o.T, W)).T

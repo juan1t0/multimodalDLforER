@@ -53,6 +53,8 @@ class Emotic_MultiDB(Dataset):
 								annotation_dir='annotations',
 								mode='train',
 								modality='all',
+								missin='',
+								takeone=False,
 								modals_dirs=[],
 								categories=[],
 								continuous=[],
@@ -63,6 +65,8 @@ class Emotic_MultiDB(Dataset):
 		self.Mode = mode
 		self.AnnotationDir = os.path.join(root_dir, annotation_dir)
 		self.Modality = modality
+		self.Missing = missin
+		self.TakeOne = takeone
 		self.Categories = categories
 		self.Continuous = continuous
 		self.Transform = transform
@@ -92,6 +96,26 @@ class Emotic_MultiDB(Dataset):
 	def resizeFace(self, newsize):
 		self.Resize_Face = newsize
 	
+	def ReviewMissing(self, sample):
+		# ctx_sum = np.sum(sample['context'])
+		# bdy_sum = np.sum(sample['body'])
+		fce_sum = np.sum(sample['face'],dtype=np.float_)
+		pos_sum = np.sum(sample['joint'],dtype=np.float_)
+
+		skip = True
+		if self.Missing == 'none' and (fce_sum == 0.0 or pos_sum == 0.0): # none should be missing (1111)
+			skip = True
+		elif self.Missing == 'face' and (fce_sum == 0.0 and pos_sum != 0.0): # face should be missing (1101)
+			skip = False
+		elif self.Missing == 'pose' and (fce_sum != 0.0 and pos_sum == 0.0): # pose should be missing (1110)
+			skip = False
+		elif self.Missing == 'both' and (fce_sum == 0.0 and pos_sum == 0.0): # both should be missing (1100)
+			skip = False
+		elif self.Missing == '':
+			skip = False
+
+		return skip
+
 	def __getitem__(self, idx):
 		if torch.is_tensor(idx):
 			 idx = idx.tolist()
@@ -138,6 +162,9 @@ class Emotic_MultiDB(Dataset):
 		if self.Transform:
 			sample = self.Transform(sample)
 
+		if self.ReviewMiss(sample):
+			return None
+		
 		return sample
 	
 	def getlabel(self, categories):
@@ -152,9 +179,13 @@ class Emotic_MultiDB(Dataset):
 				for cct in self.NewLabel['cat'][ct]:
 					if cct in curr_categories:
 						lbl[i] = 1.0
+						if self.TakeOne:
+							return lbl
 				continue
 			if ct in curr_categories:
 				lbl[i] = 1.0
+				if self.TakeOne:
+					return lbl
 		
 		return lbl
 
