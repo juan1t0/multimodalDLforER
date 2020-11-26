@@ -172,12 +172,12 @@ class Emotic_MultiDB(Dataset):
 					if cct in curr_categories:
 						lbl[i] = 1.0
 						if self.TakeOne:
-							return np.argmax(lbl)
+							return lbl
 				continue
 			if ct in curr_categories:
 				lbl[i] = 1.0
 				if self.TakeOne:
-					return np.argmax(lbl)
+					return lbl
 		
 		return lbl
 
