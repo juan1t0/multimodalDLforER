@@ -52,6 +52,7 @@ def savemodel(epoch, model_dict, opt_dict, losstrain, acctrain, lossval, accval,
 	print('Model {} saved'.format(model_saved_name))
 
 def test_AP(cat_preds, cat_labels, n_classes=8):
+	n_classes=cat_labels.shape[0]
 	ap = np.zeros(n_classes, dtype=np.float32)
 	for i in range(n_classes):
 		ap[i] = average_precision_score(cat_labels[i, :], cat_preds[i, :])
@@ -118,7 +119,7 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 		sleep(0.1)
 	
 	train_gloss = np.mean(loss_values)
-	train_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
+	train_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
 
 	if collate is not None:
 		loader = tqdm(DataLoader(val_dataset, batch_size=bsz, num_workers=0, sampler=val_sampler, collate_fn=collate),
@@ -170,7 +171,7 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 			loader.set_postfix(loss=loss.item())
 			sleep(0.1)
 	val_gloss = np.mean(loss_values)
-	val_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
+	val_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
 
 	if debug_mode:
 		print ('- Mean training loss: {:.4f} ; epoch {}'.format(train_gloss, epoch+1))
@@ -225,7 +226,7 @@ def eval(Model, dataset, bsz=32, test_sampler=None, collate=None, epoch=0, modal
 
 	# predictions = np.asarray(predictions).T
 	# labels = np.asarray(labels).T
-	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T, n_classes=8)
+	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
 	return mAP
 
 def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch,
