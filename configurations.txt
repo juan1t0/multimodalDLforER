@@ -68,6 +68,7 @@ Merge_3_configures ={
 		},
 		'device': torch.device('cuda'),
 		'trainable_probs': False,
+		'useffinal': True,
 		'use_ll1': True,
 		'use_ll2': False,
 		'll_config1': {
@@ -110,6 +111,7 @@ Merge_4_configures = {
     },
 		'device': torch.device('cuda'),
 		'trainable_probs': False,
+		'useffinal': True,
 		'use_ll': [True, False, False],
 		'll_configs': [
 			{'config': [128, 'D', 8] ,

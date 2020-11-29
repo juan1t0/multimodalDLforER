@@ -11,6 +11,20 @@ from torchvision import transforms, utils
 '''
 	revisar todo / comentar
 '''
+newlabeles = {'len':8,
+              'cat':{'joy': ['Excitement', 'Happiness', 'Peace',
+                             # 'Affection',
+                             'Pleasure',],
+                     'trust': ['Confidence', 'Esteem',
+                               'Affection',],
+                     'fear': ['Disquietment','Embarrassment','Fear',],
+                     'surprice': ['Doubt/Confusion','Surprise',],
+                     'sadness': ['Pain', 'Sadness', 'Sensitivity', 'Suffering',],
+                     'disgust': ['Aversion','Disconnection', 'Fatigue','Yearning'],
+                     'anger': ['Anger', 'Annoyance', 'Disapproval',],
+                     'anticipation': ['Anticipation', 'Engagement', 'Sympathy',]
+										 }
+              }
 
 def draw_points(image, points, color_palette='tab20', palette_samples=16):
 	import matplotlib.pyplot as plt
@@ -31,21 +45,6 @@ def draw_points(image, points, color_palette='tab20', palette_samples=16):
 def my_collate(batch):
   batch = filter(lambda img: img is not None, batch)
   return default_collate(list(batch))
-
-newlabeles = {'len':8,
-              'cat':{'joy': ['Excitement', 'Happiness', 'Peace',
-                             # 'Affection',
-                             'Pleasure',],
-                     'trust': ['Confidence', 'Esteem',
-                               'Affection',],
-                     'fear': ['Disquietment','Embarrassment','Fear',],
-                     'surprice': ['Doubt/Confusion','Surprise',],
-                     'sadness': ['Pain', 'Sadness', 'Sensitivity', 'Suffering',],
-                     'disgust': ['Aversion','Disconnection', 'Fatigue','Yearning'],
-                     'anger': ['Anger', 'Annoyance', 'Disapproval',],
-                     'anticipation': ['Anticipation', 'Engagement', 'Sympathy',]
-										 }
-              }
 
 class Emotic_MultiDB(Dataset):
 	def __init__ (self, root_dir='Emotic_MDB', annotation_dir='annotations', mode='train',

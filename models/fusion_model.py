@@ -132,7 +132,7 @@ class ModelThree(nn.Module):
 		Two embraces plus weigthed sum
 	'''
 	def __init__(self, num_classes, input_sizes, embrace1_param, embrace2_param, wsum_confg,
-								device, trainable_probs, use_ll1, use_ll2, ll_config1={}, ll_config2={}):
+								device, trainable_probs, useffinal, use_ll1, use_ll2, ll_config1={}, ll_config2={}):
 		super(ModelThree, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = input_sizes
@@ -142,6 +142,7 @@ class ModelThree(nn.Module):
 		self.WeightedSum = WeightedSum(**wsum_confg)
 		self.UseLL1 = use_ll1
 		self.UseLL2 = use_ll2
+		self.UseFinalsinFinal = useffinal
 		self.TrainableProbs = trainable_probs
 		self.initProbabilities()
 		if use_ll1:
@@ -192,6 +193,10 @@ class ModelThree(nn.Module):
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities2 = torch.stack([self.p2]*batch_size, dim=0).view(batch_size, self.InputSize +2)
+		
+		if not self.UseFinalsinFinal:
+			availabilities[:self.InputSize,:]=0.0
+
 		out = self.EmbNet2.forward(outputs2+[out1,wsout], availabilities, probabilities2)
 		if self.UseLL2:
 			out = self.LL2(out)
@@ -202,7 +207,7 @@ class ModelFour(nn.Module):
 		Three embraces, two in branches and one for merge all
 	'''
 	def __init__(self, num_classes, input_sizes, embrace1_param, embrace2_param, embrace3_param, wsum_confg,
-								device, trainable_probs, use_ll, ll_configs):
+								device, trainable_probs, useffinal, use_ll, ll_configs):
 		super(ModelFour, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = input_sizes
@@ -214,6 +219,7 @@ class ModelFour(nn.Module):
 		self.UseLL1 = use_ll[0]
 		self.UseLL2 = use_ll[1]
 		self.UseLL3 = use_ll[2]
+		self.UseFinalsinFinal = useffinal
 		self.TrainableProbs = trainable_probs
 		self.initProbabilities()
 		if self.UseLL1:
@@ -258,6 +264,10 @@ class ModelFour(nn.Module):
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities1 = torch.stack([self.p1]*batch_size,dim=0).view(batch_size, self.InputSize)
+		
+		if not self.UseFinalsinFinal:
+			availabilities[:self.InputSize,:]=0.0
+
 		out1 = self.EmbNet1.forward(outputs1, availabilities[:,:-3], probabilities1)#availabilities without last column
 		if self.UseLL1:
 			out1 = self.LL1(out1)
