@@ -384,7 +384,7 @@ class ModelNewFour(nn.Module):
 		if not self.UseWSum:
 			availabilities[:, -2] = 0.0
 
-		out = self.EmbNet3.forward([out1,out2,wsout,concat], availabilities[4:], probabilities3)
+		out = self.EmbNet3.forward([out1,out2,wsout,concat], availabilities[:, 4:], probabilities3)
 		
 		if self.UseLL3:
 			out = self.LL3(out)
