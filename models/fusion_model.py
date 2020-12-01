@@ -356,24 +356,24 @@ class ModelNewFour(nn.Module):
 
 	def forward(self, outputs1, outputs2, available):
 		batch_size = outputs1[0].shape[0]
-		availabilities = torch.ones(batch_size , self.InputSize+3, dtype=torch.float, device=self.Device) # len(outputs)
+		availabilities = torch.ones(batch_size , self.InputSize+4, dtype=torch.float, device=self.Device) # len(outputs)
 		for i, av in enumerate(available):
 			if av == 0.0:
 				availabilities[:,i] = 0.0 ## review if it works
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities1 = torch.stack([self.p1]*batch_size,dim=0).view(batch_size, self.InputSize)
-		out1 = self.EmbNet1.forward(outputs1, availabilities[:,:-3], probabilities1)#availabilities without last column
+		out1 = self.EmbNet1.forward(outputs1, availabilities[:,:-4], probabilities1)#availabilities without last column
 		if self.UseLL1:
 			out1 = self.LL1(out1)
 		
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
 		probabilities2 = torch.stack([self.p2]*batch_size,dim=0).view(batch_size, self.InputSize)
-		out2 = self.EmbNet2.forward(outputs2, availabilities[:,:-3], probabilities2)#availabilities without last column
+		out2 = self.EmbNet2.forward(outputs2, availabilities[:,:-4], probabilities2)#availabilities without last column
 		if self.UseLL2:
 			out2 = self.LL2(out2)
 
-		wsout = self.WeightedSum.forward(torch.stack(outputs2, dim=1), availabilities[:,:-3])
+		wsout = self.WeightedSum.forward(torch.stack(outputs2, dim=1), availabilities[:,:-4])
 		concat = torch.cat(outputs2, dim=-1)#.view(batch_size,)
 
 		# probabilities = torch.stack([self.p]*batch_size, dim=-1)
@@ -384,7 +384,7 @@ class ModelNewFour(nn.Module):
 		if not self.UseWSum:
 			availabilities[:, -2] = 0.0
 
-		out = self.EmbNet3.forward([out1,out2,wsout,concat], availabilities, probabilities3)
+		out = self.EmbNet3.forward([out1,out2,wsout,concat], availabilities[4:], probabilities3)
 		
 		if self.UseLL3:
 			out = self.LL3(out)
