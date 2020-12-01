@@ -1,18 +1,202 @@
-Merge_1_configures ={
+#######################################
+Model 1																#
+#######################################
+# middle
+Merge_11_configures ={
 	'type':	1,
 	'parameters': {
 		'num_classes': 8,
-		'input_sizes': [8, 8, 8, 8, ], # [512, 512, 512, 512, ], # 
-		'embrace_size': 8, # 512,
-		'docker_architecture': [[16, 8], [16, 8], [16, 8], [16, 8],], # [[1024, 512], [1024, 512], [1024, 512], [1024, 512],], # 
-		'finalouts': True, # False, #
+		'input_sizes': [512, 512, 512, 512, ],
+		'embrace_size': 512,
+		'docker_architecture': [[512], [512], [512], [512],],
+		'finalouts': False,
 		'device': torch.device('cuda'),
-    'use_ll': False, # True, #
-		'll_config': [], # [256, 128, 8], # 
+    'use_ll': True,
+		'll_config': [256, 'D', 128, 'D', 'R', 8],
 		'trainable_probs': False # True, #
 		}
 }
 
+# final simple
+Merge_12_configures ={
+	'type':	1,
+	'parameters': {
+		'num_classes': 8,
+		'input_sizes': [8, 8, 8, 8, ],
+		'embrace_size': 8,
+		'docker_architecture': [[8], [8], [8], [8],],
+		'finalouts': True,
+		'device': torch.device('cuda'),
+    'use_ll': False,
+		'll_config': [],
+		'trainable_probs': False # True, #
+		}
+}
+
+# final less simple
+Merge_13_configures ={
+	'type':	1,
+	'parameters': {
+		'num_classes': 8,
+		'input_sizes': [8, 8, 8, 8, ],
+		'embrace_size': 16,
+		'docker_architecture': [[16], [16], [16], [16],],
+		'finalouts': True,
+		'device': torch.device('cuda'),
+    'use_ll': True,
+		'll_config': ['D', 8],
+		'trainable_probs': False # True, #
+		}
+}
+#######################################
+
+#######################################
+Model 3															###
+#######################################
+# all
+Merge_31_configures ={
+	'type':	3,
+	'parameters': {
+		'num_classes': 8,
+		'input_sizes': 4,
+		'embrace1_param': {
+			'input_size_list': [512, 512, 512, 512, ],
+			'embracement_size': 512,
+			'docker_arch': [[1024, 'D', 512], [1024, 'D', 512], [1024, 'D', 512], [1024, 'D', 512],],
+			'device': torch.device('cuda'),
+		},
+		'embrace2_param':{
+			'input_size_list': [8, 8, 8, 8, 16, 8, ],
+			'embracement_size': 16,
+			'docker_arch': [[16], [16], [16], [16], [16], [16],],
+			'device': torch.device('cuda'),
+		},
+		'wsum_confg': {
+			'number_modals': 4,
+			'outchannels': 1,
+			'probabilities': None,
+			'trainable': False,
+			'mode': 'tensor', # 'convs', #
+			'device': torch.device('cuda'),
+		},
+		'device': torch.device('cuda'),
+		'trainable_probs': False,
+		'useffinal': True,
+		'use_ws': True,
+		'use_ll1': True,
+		'use_ll2': True,
+		'll_config1': {
+			'config': [128,'D',16] ,
+			'embrace_size': 512,
+		},
+		'll_config2': {
+			'config': [32,'D', 'R', 8] ,
+			'embrace_size': 16,
+		}
+	}
+}
+
+#########################################
+
+#########################################
+Model 4															 ####
+#########################################
+# all
+Merge_41_configures = {
+	'type':	4,
+	'parameters': {
+		'num_classes': 8,
+		'input_sizes': 4,
+		'embrace1_param': {
+			'input_size_list': [512, 512, 512, 512, ],
+			'embracement_size': 512,
+			'docker_arch': [[1024, 'D', 512], [1024, 'D', 512], [1024, 'D', 512], [1024, 'D', 512],],
+			'device': torch.device('cuda'),
+		},
+		'embrace2_param': {
+			'input_size_list': [8, 8, 8, 8, ],
+			'embracement_size': 16,
+			'docker_arch': [[32, 'D', 16], [32, 'D', 16], [32, 'D', 16], [32, 'D', 16],],
+			'device': torch.device('cuda'),
+		},
+		'embrace3_param': {
+			'input_size_list': [8, 8, 8, 8, 16, 16, 8,],
+			'embracement_size': 16,
+			'docker_arch': [[16], [16], [16], [16], [16], [16], [16],],
+			'device': torch.device('cuda'),
+		},
+		'wsum_confg': {
+      'number_modals': 4,
+			'outchannels': 1,
+			'probabilities': None,
+			'trainable': False,
+			'mode': 'tensor', # 'convs', #
+			'device': torch.device('cuda'),
+    },
+		'device': torch.device('cuda'),
+		'trainable_probs': False,
+		'useffinal': True,
+		'use_ws': True,
+		'use_ll': [True, False, True],
+		'll_configs': [
+			{'config': [128, 'D', 16] ,
+			'embrace_size': 512,},
+			{},
+			{'config': [32, 'D', 'R', 8] ,
+			'embrace_size': 16,}
+		]}
+}
+################# new
+
+Merge_5_configures = {
+	'type':	5,
+	'parameters': {
+		'num_classes': 8,
+		'input_sizes': 4,
+		'final_input_sizes': 4,
+		'embrace1_param': {
+			'input_size_list': [512, 512, 512, 512, ],
+			'embracement_size': 512,
+			'docker_arch': [[1024, 'D', 512], [1024, 'D', 512], [1024, 'D', 512], [1024, 'D', 512],],
+			'device': torch.device('cuda'),
+		},
+		'embrace2_param': {
+			'input_size_list': [8, 8, 8, 8, ],
+			'embracement_size': 32,
+			'docker_arch': [[64, 'D', 32], [64, 'D', 32], [64, 'D', 32], [64, 'D', 32],],
+			'device': torch.device('cuda'),
+		},
+		'embrace3_param': {
+			'input_size_list': [128, 32, 8, 32,],
+			'embracement_size': 32,
+			'docker_arch': [[32], [32], [32], [32],],
+			'device': torch.device('cuda'),
+		},
+		'wsum_confg': {
+      'number_modals': 4,
+			'outchannels': 1,
+			'probabilities': None,
+			'trainable': False,
+			'mode': 'tensor', # 'convs', #
+			'device': torch.device('cuda'),
+    },
+		'device': torch.device('cuda'),
+		'trainable_probs': False,
+		'useffinal': True,
+		'use_ws': True,
+		'use_ll': [True, False, True],
+		'll_configs': [
+			{'config': [128] ,
+			'embrace_size': 512,},
+			{},
+			{'config': [8] ,
+			'embrace_size': 32,}
+		]}
+}
+
+###########################################
+
+#No use
 Merge_2_configures ={
 	'type':	2,
 	'parameters': {
@@ -40,83 +224,4 @@ Merge_2_configures ={
 		},
 		'll_config2':{},
 	}
-}
-
-Merge_3_configures ={
-	'type':	3,
-	'parameters': {
-		'num_classes': 8,
-		'input_sizes': 4,
-		'embrace1_param': {
-			'input_size_list': [512, 512, 512, 512, ],
-			'embracement_size': 512,
-			'docker_arch': [[1024, 512], [1024, 512], [1024, 512], [1024, 512],],
-			'device': torch.device('cuda'),
-		},
-		'embrace2_param':{
-			'input_size_list': [8, 8, 8, 8, 8, 8, ],
-			'embracement_size': 8,
-			'docker_arch': [[16, 8], [16, 8], [16, 8], [16, 8], [16, 8], [16, 8],],
-			'device': torch.device('cuda'),
-		},
-		'wsum_confg': {
-			'number_modals': 4,
-			'stable': [0,1],
-			'outchannels': 1,
-			'mode': 'tensor', # 'convs', #
-			'device': torch.device('cuda'),
-		},
-		'device': torch.device('cuda'),
-		'trainable_probs': False,
-		'useffinal': True,
-		'use_ll1': True,
-		'use_ll2': False,
-		'll_config1': {
-			'config': [128,'D',8] ,
-			'embrace_size': 512,
-		},
-		'll_config2': {}
-	}
-}
-
-Merge_4_configures = {
-	'type':	4,
-	'parameters': {
-		'num_classes': 8,
-		'input_sizes': 4,
-		'embrace1_param': {
-			'input_size_list': [512, 512, 512, 512, ],
-			'embracement_size': 512,
-			'docker_arch': [[1024, 512], [1024, 512], [1024, 512], [1024, 512],],
-			'device': torch.device('cuda'),
-		},
-		'embrace2_param': {
-			'input_size_list': [8, 8, 8, 8, ],
-			'embracement_size': 8,
-			'docker_arch': [[16, 8], [16, 8], [16, 8], [16, 8],],
-			'device': torch.device('cuda'),
-		},
-		'embrace3_param': {
-			'input_size_list': [8, 8, 8, 8, 8, 8, 8,],
-			'embracement_size': 8,
-			'docker_arch': [[16, 8], [16, 8], [16, 8], [16, 8], [16, 8], [16, 8], [16, 8],],
-			'device': torch.device('cuda'),
-		},
-		'wsum_confg': {
-      'number_modals': 4,
-			'stable': [0,1],
-			'outchannels': 1,
-			'mode': 'tensor', # 'convs', #
-			'device': torch.device('cuda'),
-    },
-		'device': torch.device('cuda'),
-		'trainable_probs': False,
-		'useffinal': True,
-		'use_ll': [True, False, False],
-		'll_configs': [
-			{'config': [128, 'D', 8] ,
-			'embrace_size': 512,},
-			{},
-			{}
-		]}
 }
