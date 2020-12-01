@@ -305,7 +305,7 @@ class ModelNewFour(nn.Module):
 	def __init__(self, num_classes, input_sizes, final_input_sizes,
 								embrace1_param, embrace2_param, embrace3_param, wsum_confg,
 								device, trainable_probs, useffinal, use_ws, use_ll, ll_configs):
-		super(ModelFour, self).__init__()
+		super(ModelNewFour, self).__init__()
 		self.NClasses =  num_classes
 		self.InputSize = input_sizes
 		self.FinalInputSize = final_input_sizes
