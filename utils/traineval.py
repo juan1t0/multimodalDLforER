@@ -227,7 +227,7 @@ def eval(Model, dataset, bsz=32, test_sampler=None, collate=None, epoch=0, modal
 	# predictions = np.asarray(predictions).T
 	# labels = np.asarray(labels).T
 	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
-	return mAP
+	return mAP, predictions, labeles
 
 def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch,
 								tsampler, vsampler,
