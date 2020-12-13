@@ -1,4 +1,4 @@
-# https://github.com/kenziyuliu/Unofficial-DGNN-PyTorch
+# Unfinished
 
 import os
 import time
@@ -23,10 +23,6 @@ from torch.utils.data import DataLoader
 from utils.dataset import Emotic_MDB
 from models.scofmer import Model as SCOF_model
 
-'''
-	eliminar lo innecesario
-	revisar opt, train, start
-'''
 
 def init_seed(_):
 	torch.cuda.manual_seed_all(1)

@@ -1,4 +1,9 @@
-import csv 
+"""
+  Implementation based on https://github.com/Tandon-A/emotic/blob/master/mat2py.py
+  The applied changes allow get the appropiated data for train and test
+"""
+
+import csv
 import cv2
 import numpy as np 
 import os 
@@ -320,31 +325,3 @@ def prepare_data(data_mat, data_path_src, save_dirs, dataset_type='train',
   
   print ('wrote file ', csv_path)
   print ('completed generating %s data files' %(dataset_type))
-
-'''  
-ann_path_src = os.path.join(args.data_dir, 'Annotations','Annotations.mat')
-data_path_src = os.path.join(args.data_dir, 'emotic')
-save_path = os.path.join(args.data_dir, args.save_dir_name)
-if not os.path.exists(save_path):
-  os.makedirs(save_path)
-
-cat = ['Affection', 'Anger', 'Annoyance', 'Anticipation', 'Aversion', 'Confidence', 'Disapproval', 'Disconnection',
-    'Disquietment', 'Doubt/Confusion', 'Embarrassment', 'Engagement', 'Esteem', 'Excitement', 'Fatigue', 'Fear',
-    'Happiness', 'Pain', 'Peace', 'Pleasure', 'Sadness', 'Sensitivity', 'Suffering', 'Surprise', 'Sympathy', 'Yearning']
-cat2ind = {}
-ind2cat = {}
-for idx, emotion in enumerate(cat):
-    cat2ind[emotion] = idx
-    ind2cat[idx] = emotion
-
-print ('loading Annotations')
-mat = loadmat(ann_path_src)
-if args.label.lower() == 'all':
-  labels = ['train', 'val', 'test']
-else:
-  labels = [args.label.lower()]
-for label in labels:
-  data_mat = mat[label]
-  print ('starting label ', label)
-  prepare_data(data_mat, data_path_src, save_path, dataset_type=label, generate_npy=args.generate_npy, debug_mode=args.debug_mode)
-'''

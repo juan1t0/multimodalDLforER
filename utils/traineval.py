@@ -1,3 +1,8 @@
+"""
+	There are the functions for carry out the training, the evaluation, the model saving, and the AP calculator.
+	The AP calculator is taken from https://github.com/Tandon-A/emotic/blob/master/Colab_train_emotic.ipynb.
+"""
+
 import os
 import numpy as np
 from time import sleep
@@ -8,35 +13,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from sklearn.metrics import average_precision_score, precision_recall_curve
-
-class DiscreteLoss(nn.Module):
-	def __init__(self, weight_type='mean', device=torch.device('cpu'), classes=26):
-		super(DiscreteLoss, self).__init__()
-		self.weight_type = weight_type
-		self.device = device
-		self.Classes = classes
-		if self.weight_type == 'mean':
-			self.weights = torch.ones((1,classes))/float(classes)
-			self.weights = self.weights.to(self.device)
-		elif self.weight_type == 'static':
-			self.weights = torch.FloatTensor([0.1435, 0.1870, 0.1692, 0.1165, 0.1949, 0.1204, 0.1728, 0.1372, 0.1620,
-				0.1540, 0.1987, 0.1057, 0.1482, 0.1192, 0.1590, 0.1929, 0.1158, 0.1907,
-				0.1345, 0.1307, 0.1665, 0.1698, 0.1797, 0.1657, 0.1520, 0.1537]).unsqueeze(0)
-			self.weights = self.weights.to(self.device)
-		
-	def forward(self, pred, target):
-		if self.weight_type == 'dynamic':
-			self.weights = self.prepare_dynamic_weights(target)
-			self.weights = self.weights.to(self.device)
-		loss = (((pred - target)**2) * self.weights)
-		return loss.sum() 
-
-	def prepare_dynamic_weights(self, target):
-		target_stats = torch.sum(target, dim=0).float().unsqueeze(dim=0).cpu()
-		weights = torch.zeros((1,self.Classes))
-		weights[target_stats != 0 ] = 1.0/torch.log(target_stats[target_stats != 0].data + 1.2)
-		weights[target_stats == 0] = 0.0001
-		return weights
 
 def savemodel(epoch, model_dict, opt_dict, losstrain, acctrain, lossval, accval,
 							save_dir, modelname, save_name):
@@ -60,7 +36,6 @@ def test_AP(cat_preds, cat_labels, n_classes=8):
 	print ('AveragePrecision: {} |{}| mAP: {}'.format(ap, ap.shape[0], ap.mean()))
 	return ap.mean()
 
-# modal could be: all, pose , context, body, face
 def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 					collate=None, train_sampler=None, val_sampler=None, epoch=0,
 					modal='all', device=torch.device('cpu'), debug_mode=False, tqdm=None):
@@ -78,18 +53,18 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 		with torch.no_grad():
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['body'] = batch_sample['body'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['face'] = batch_sample['face'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['joint'] = batch_sample['joint'].to(device)#.float().to(device)
-				sample['bone'] = batch_sample['bone'].to(device)#.float().to(device)
+				sample['context'] = batch_sample['context'].to(device)
+				sample['body'] = batch_sample['body'].to(device)
+				sample['face'] = batch_sample['face'].to(device)
+				sample['joint'] = batch_sample['joint'].to(device)
+				sample['bone'] = batch_sample['bone'].to(device)
 			elif modal == 'pose':
-				sample = (batch_sample['joint'].to(device),#.float().to(device),
-									batch_sample['bone'].to(device))#.float().to(device))
+				sample = (batch_sample['joint'].to(device),
+									batch_sample['bone'].to(device))
 			else:
-				sample = batch_sample[modal].to(device)#.float().permute(0,3,1,2).to(device)
+				sample = batch_sample[modal].to(device)
 			
-			label = batch_sample['label'].to(device)#.float().to(device)
+			label = batch_sample['label'].to(device)
 
 		optimizer.zero_grad()
 		if modal =='pose':
@@ -119,7 +94,7 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 		sleep(0.1)
 	
 	train_gloss = np.mean(loss_values)
-	train_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
+	train_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)
 
 	if collate is not None:
 		loader = tqdm(DataLoader(val_dataset, batch_size=bsz, num_workers=0, sampler=val_sampler, collate_fn=collate),
@@ -136,18 +111,18 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 		for batch_idx, batch_sample in enumerate(loader):
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['body'] = batch_sample['body'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['face'] = batch_sample['face'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['joint'] = batch_sample['joint'].to(device)#.float().to(device)
-				sample['bone'] = batch_sample['bone'].to(device)#.float().to(device)
+				sample['context'] = batch_sample['context'].to(device)
+				sample['body'] = batch_sample['body'].to(device)
+				sample['face'] = batch_sample['face'].to(device)
+				sample['joint'] = batch_sample['joint'].to(device)
+				sample['bone'] = batch_sample['bone'].to(device)
 			elif modal == 'pose':
-				sample = (batch_sample['joint'].to(device),#.float().to(device),
-									batch_sample['bone'].to(device))#.float().to(device))
+				sample = (batch_sample['joint'].to(device),
+									batch_sample['bone'].to(device))
 			else:
-				sample = batch_sample[modal].to(device)#.float().permute(0,3,1,2).to(device)
+				sample = batch_sample[modal].to(device)
 
-			label = batch_sample['label'].to(device)#.float().to(device)
+			label = batch_sample['label'].to(device)
 
 			if modal =='pose':
 				output, _ = Model.forward(sample, 0)
@@ -171,7 +146,7 @@ def train(Model, train_dataset, Loss, optimizer, val_dataset, bsz=32,
 			loader.set_postfix(loss=loss.item())
 			sleep(0.1)
 	val_gloss = np.mean(loss_values)
-	val_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
+	val_mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)
 
 	if debug_mode:
 		print ('- Mean training loss: {:.4f} ; epoch {}'.format(train_gloss, epoch+1))
@@ -196,37 +171,31 @@ def eval(Model, dataset, bsz=32, test_sampler=None, collate=None, epoch=0, modal
 		with torch.no_grad():
 			if modal == 'all':
 				sample = dict()
-				sample['context'] = batch_sample['context'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['body'] = batch_sample['body'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['face'] = batch_sample['face'].to(device)#.float().permute(0,3,1,2).to(device)
-				sample['joint'] = batch_sample['joint'].to(device)#.float().to(device)
-				sample['bone'] = batch_sample['bone'].to(device)#.float().to(device)
+				sample['context'] = batch_sample['context'].to(device)
+				sample['body'] = batch_sample['body'].to(device)
+				sample['face'] = batch_sample['face'].to(device)
+				sample['joint'] = batch_sample['joint'].to(device)
+				sample['bone'] = batch_sample['bone'].to(device)
 				output, _ = Model.forward(sample)
 				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			elif modal == 'pose':
-				sample = (batch_sample['joint'].to(device),#.float().to(device),
-									batch_sample['bone'].to(device))#.float().to(device))
+				sample = (batch_sample['joint'].to(device),
+									batch_sample['bone'].to(device))
 				output, _ = Model.forward(sample,0)
 				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			else:
-				sample = batch_sample[modal].to(device)#.float().permute(0,3,1,2).to(device)
+				sample = batch_sample[modal].to(device)
 				if modal == 'face':
 					output, _ = Model.forward(sample)
-				else: # context or body
+				else:
 					output, _, _ = Model.forward(sample)
 				predictions += [output[i].to('cpu').data.numpy() for i in range(output.shape[0])]
 			
-			label = batch_sample['label']# .float() # .to(device)
+			label = batch_sample['label']
 		
 		labeles += [label[i].data.numpy() for i in range(label.shape[0])]
-		# predictions[(batch_idx*32):(batch_idx*32 +32),:] = output.to('cpu').data.numpy()
-		# labels[(batch_idx*32):(batch_idx*32 +32),:] = label.data.numpy()
-		# value, predict_label = torch.max(output, 1)
-		# acc_values.append(torch.mean((predict_label == label).float()))
 
-	# predictions = np.asarray(predictions).T
-	# labels = np.asarray(labels).T
-	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)#, n_classes=nclasses)
+	mAP = test_AP(np.asarray(predictions).T, np.asarray(labeles).T)
 	return mAP, predictions, labeles
 
 def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch,
@@ -251,11 +220,7 @@ def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch
 							losstrain=tl,	acctrain=ta,
 							lossval=tl,	accval=ta,
 							save_dir=checkpointdir, modelname=model_name, save_name='_best')
-	# if (epoch+1) % step2val == 0:
-	# 	l, a = train(Model=Model, dataset=dataset_v, Loss=Loss, optimizer=optimizer, bsz=bsz, collate=collate,
-	# 								epoch=epoch, modal=modal, device=device, debug_mode=debug_mode, tqdm=tqdm)
-	# 	val_loss[epoch:(epoch+step2val)] = [l]*step2val
-	# 	val_map[epoch:(epoch+step2val)] = [a]*step2val
+
 	if (epoch+1) % step2save == 0 or (epoch+1) == last_epoch:
 		savemodel(epoch=epoch,
 							model_dict=Model.state_dict(),

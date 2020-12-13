@@ -1,3 +1,8 @@
+"""
+	Implementation based on explanation in 	https://pytorch.org/tutorials/beginner/data_loading_tutorial.html
+	There are the Dataset class and the transformers to applicate in the DataLoader
+"""
+
 import os
 import pandas as pd
 import numpy as np
@@ -8,57 +13,39 @@ from torch.utils.data import Dataset#, DataLoader
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms, utils
 
-'''
-	revisar todo / comentar
-'''
 newlabeles = {'len':8,
-              'cat':{'joy': ['Excitement', 'Happiness', 'Peace',
-                             # 'Affection',
-                             'Pleasure',],
-                     'trust': ['Confidence', 'Esteem',
-                               'Affection',],
-                     'fear': ['Disquietment','Embarrassment','Fear',],
-                     'surprice': ['Doubt/Confusion','Surprise',],
-                     'sadness': ['Pain', 'Sadness', 'Sensitivity', 'Suffering',],
-                     'disgust': ['Aversion','Disconnection', 'Fatigue','Yearning'],
-                     'anger': ['Anger', 'Annoyance', 'Disapproval',],
-                     'anticipation': ['Anticipation', 'Engagement', 'Sympathy',]
-										 }
-              }
-
-def draw_points(image, points, color_palette='tab20', palette_samples=16):
-	import matplotlib.pyplot as plt
-	try:
-		colors = np.round(np.array(plt.get_cmap(color_palette).colors) * 255
-											).astype(np.uint8)[:, ::-1].tolist()
-	except AttributeError:  # if palette has not pre-defined colors
-		colors = np.round(np.array(plt.get_cmap(color_palette)(np.linspace(0, 1, palette_samples))) * 255
-											).astype(np.uint8)[:, -2::-1].tolist()
-
-	circle_size = max(1, min(image.shape[:2]) // 160)  # ToDo Shape it taking into account the size of the detection
-	# circle_size = max(2, int(np.sqrt(np.max(np.max(points, axis=0) - np.min(points, axis=0)) // 16)))
-	for i, pt in enumerate(points):
-		if pt[2] > 0.01:
-			image = cv2.circle(image, (int(pt[1]), int(pt[0])), circle_size, tuple(colors[i % len(colors)]), -1)
-	return image
+							'cat':{'joy': ['Excitement', 'Happiness', 'Peace',
+														# 'Affection',
+														'Pleasure',],
+										'trust': ['Confidence', 'Esteem',
+															'Affection',],
+										'fear': ['Disquietment','Embarrassment','Fear',],
+										'surprice': ['Doubt/Confusion','Surprise',],
+										'sadness': ['Pain', 'Sadness', 'Sensitivity', 'Suffering',],
+										'disgust': ['Aversion','Disconnection', 'Fatigue','Yearning'],
+										'anger': ['Anger', 'Annoyance', 'Disapproval',],
+										'anticipation': ['Anticipation', 'Engagement', 'Sympathy',]
+										}
+							}
 
 def my_collate(batch):
-  batch = filter(lambda img: img is not None, batch)
-  return default_collate(list(batch))
+	"""
+		this function allows manage the missin data from the dataset, it is used for the DataLoader
+	"""
+	batch = filter(lambda img: img is not None, batch)
+	return default_collate(list(batch))
 
 class Emotic_MultiDB(Dataset):
 	def __init__ (self, root_dir='Emotic_MDB', annotation_dir='annotations', mode='train',
 								modality='all',
-								#missin='',
 								takeone=False, modals_dirs=[],
-							 	categories=[], continuous=[], transform=None):
+								categories=[], continuous=[], transform=None):
 
 		super(Emotic_MultiDB, self).__init__()
 		self.RootDir = root_dir
 		self.Mode = mode
 		self.AnnotationDir = os.path.join(root_dir, annotation_dir)
 		self.Modality = modality
-		# self.Missing = missin
 		self.TakeOne = takeone
 		self.Categories = categories
 		self.Continuous = continuous
@@ -86,27 +73,9 @@ class Emotic_MultiDB(Dataset):
 		self.NewLabel = newlabels
 		self.Categories = list(newlabels['cat'].keys())
 
-	# def ReviewMissing(self, sample):
-	# 	# ctx_sum = np.sum(sample['context'])
-	# 	# bdy_sum = np.sum(sample['body'])
-	# 	fce_sum = np.sum(sample['face'],dtype=np.float_)
-	# 	pos_sum = np.sum(sample['joint'],dtype=np.float_)
-	# 	skip = True
-	# 	if self.Missing == 'none' and (fce_sum != 0.0 and pos_sum != 0.0): # none should be missing (1111)
-	# 		skip = False
-	# 	elif self.Missing == 'face' and (fce_sum == 0.0 and pos_sum != 0.0): # face should be missing (1101)
-	# 		skip = False
-	# 	elif self.Missing == 'pose' and (fce_sum != 0.0 and pos_sum == 0.0): # pose should be missing (1110)
-	# 		skip = False
-	# 	elif self.Missing == 'both' and (fce_sum == 0.0 and pos_sum == 0.0): # both should be missing (1100)
-	# 		skip = False
-	# 	elif self.Missing == '':
-	# 		skip = False
-	# 	return skip
-
 	def __getitem__(self, idx):
 		if torch.is_tensor(idx):
-			 idx = idx.tolist()
+			idx = idx.tolist()
 		
 		if self.Modality == 'label':
 			if len(self.Continuous)==0:
@@ -154,8 +123,6 @@ class Emotic_MultiDB(Dataset):
 		
 		if self.Transform:
 			sample = self.Transform(sample)
-		# if self.ReviewMissing(sample):
-		# 	return None
 		return sample
 	
 	def getlabel(self, categories):
@@ -287,8 +254,8 @@ class ToTensor(object):
 		fac = fac.transpose((2, 0, 1))
 
 		return {'label': torch.from_numpy(lbl).float(),
-						 'context': torch.from_numpy(ctx).float(),
-						 'body': torch.from_numpy(bod).float(),
-						 'face': torch.from_numpy(fac).float(),
-						 'joint': torch.from_numpy(joi).float(),
-						 'bone': torch.from_numpy(bon).float()}
+						'context': torch.from_numpy(ctx).float(),
+						'body': torch.from_numpy(bod).float(),
+						'face': torch.from_numpy(fac).float(),
+						'joint': torch.from_numpy(joi).float(),
+						'bone': torch.from_numpy(bon).float()}
