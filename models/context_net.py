@@ -1,13 +1,14 @@
+"""
+	The model implemented here is the same as https://github.com/machine-perception-robotics-group/attention_branch_network (ResNet)
+	The functions for creating the model and loading the imagenet  weights have been redone.
+"""
+
 import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 import math
 
 from torchvision.models.utils import load_state_dict_from_url
-
-
-# __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
-#            'resnet152']
 
 model_urls = {
 	'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -175,13 +176,6 @@ class ResNet(nn.Module):
 		out_rx = self.fc(rx)
 
 		return out_rx, out_ax, [fe, self.att, per, rx]
-
-# pretrained_dict = load_state_dict_from_url(model_urls['resnet18'])
-		# model_dict = model.state_dict()
-		# pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-		# model_dict.update(pretrained_dict)
-		# model.load_state_dict(pretrained_dict)
-		# print('model loaded from {}'.format(model_urls['resnet18']))
 
 def resnet18(pretrained=False, num_classes=1000):
 	model = ResNet(BasicBlock, [2, 2, 2, 2], num_classes)

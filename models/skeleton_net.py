@@ -1,3 +1,8 @@
+"""
+	Original implementation at https://github.com/kenziyuliu/Unofficial-DGNN-PyTorch
+	Only the shape of the graph used was modified.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

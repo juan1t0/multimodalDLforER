@@ -1,8 +1,12 @@
+"""
+	Implementation of https://github.com/WuJie1010/Facial-Expression-Recognition.Pytorch was taken as the basis for this implementation.
+	The model implemented here is a VGG that due to the size of the input images (48x48) an fc of 512 is used.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-# import torch.utils.model_zoo as model_zoo
 
 from torchvision.models.utils import load_state_dict_from_url
 from torchvision.models import vgg19
@@ -22,7 +26,7 @@ model_urls = {
 }
 
 class ShortVGG(nn.Module):
-	def __init__(self, vgg_name, numclasses, pretrain=False):
+	def __init__(self, vgg_name='VGG19', numclasses=8, pretrain=False):
 		super(ShortVGG, self).__init__()
 		self.Name = vgg_name
 		self.features = self._make_layers(cfg[vgg_name])
@@ -51,23 +55,19 @@ class ShortVGG(nn.Module):
 									nn.ReLU(inplace=True)]
 				in_channels = x
 		
-		# layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
 		return nn.Sequential(*layers)
 
 	def load_pretrain(self):
 		state_dict = load_state_dict_from_url(model_urls[self.Name])
-		#model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
 		currstate = self.state_dict()
 		ml, mm = 0, 0
 		for name, param in state_dict.items():
 			if name not in currstate:
 				continue
 			if isinstance(param, torch.nn.parameter.Parameter):
-				# backwards compatibility for serialized parameters
 				param = param.data
 			try:
 				currstate[name].copy_(param)
-				# currstate[name].requires_grad = False
 				ml += 1
 			except:
 				print('missing', name)
@@ -75,50 +75,3 @@ class ShortVGG(nn.Module):
 				pass
 		self.load_state_dict(currstate)
 		print('{} modules loaded and {} modules missing'.format(ml,mm))
-
-def getTorchVGG(numclasses, pretrained=False):
-	model = vgg19(pretrained)
-	for param in model.parameters():
-		param.requires_grad = False
-	model.classifier = nn.Sequential(nn.Linear(512 * 7 * 7, 4096),
-																	nn.ReLU(True),
-																	nn.Dropout(),
-																	nn.Linear(4096, 1024),
-																	nn.ReLU(True),
-																	nn.Dropout(),
-																	nn.Linear(1024, numclasses))
-	
-	return model
-
-class SimpleModel (nn.Module):
-	def __init__(self, inchanels=144, outchanels=26) :
-		super(SimpleModel, self).__init__()
-		self.inchanels = inchanels
-		self.outchanels = outchanels
-
-		self.conv_layers = nn.Sequential(
-				nn.Conv1d(inchanels, 256, kernel_size=1),
-				nn.BatchNorm1d(256),
-				nn.ReLU(),
-
-				nn.Conv1d(256, 512, kernel_size=1),
-				nn.BatchNorm1d(512),
-				nn.ReLU(),
-
-				nn.Conv1d(512, 1024, kernel_size=1),
-				nn.BatchNorm1d(1024),
-				nn.ReLU(),
-
-				nn.MaxPool1d(kernel_size=1, stride=1)
-		)
-		self.lner_layers = nn.Sequential(
-				nn.Linear(1024, 1024),
-				nn.Linear(1024, 512),
-				nn.Linear(512, 256),
-				nn.Linear(256, outchanels)
-		)
-	def forward(self, x):
-		x = self.conv_layers(x)
-		x = x.view(x.size(0), -1)
-		x = self.lner_layers(x)
-		return x

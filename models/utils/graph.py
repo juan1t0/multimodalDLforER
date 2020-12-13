@@ -1,3 +1,8 @@
+"""
+	The implementation of the original graph for DGCN is at https://github.com/kenziyuliu/Unofficial-DGNN-PyTorch
+	Here the construction of the graph is changed, but the rest is the same as the original.
+"""
+
 from typing import Tuple, List
 from collections import defaultdict
 
@@ -28,35 +33,6 @@ def get_spatial_graph(num_node, self_link, inward, outward):
 	A = np.stack((I, In, Out))
 	return A
 
-##############################Open pose##############################
-
-# Joint index:
-# {0:  'Nose'}
-# {1:  'Neck'},
-# {2:  'RShoulder'},
-# {3:  'RElbow'},
-# {4:  'RWrist'},
-# {5:  'LShoulder'},
-# {6:  'LElbow'},
-# {7:  'LWrist'},
-# {8:  'Hip'},
-# {9:  'RHip'},
-# {10: 'RKnee'},
-# {11: 'RAnkle'},
-# {12: 'LHip'},
-# {13: 'LKnee'},
-# {14: 'LAnkle'},
-# {15: 'REye'},
-# {16: 'LEye'},
-# {17: 'REar'},
-# {18: 'LEar'}
-# {19: 'LFoot1'}
-# {20: 'LFoot2'}
-# {21: 'LFoot3'}
-# {22: 'RFoot1'}
-# {23: 'RFoot2'}
-# {24: 'RFoot3'}
-
 ##############################simple COCO##############################
 # Joint index:
 # {0:  'Nose'}
@@ -76,32 +52,13 @@ def get_spatial_graph(num_node, self_link, inward, outward):
 # {14: 'Hip'},
 epsilon = 1e-6
 
-num_nodes = 15 # 25
-# directed_edges =[(0,1),(0,15),(0,16),(1,2),(1,5),
-#     (1,8),(2,3),(3,4),(5,6),(6,7),
-#     (8,9),(8,12),(9,10),(10,11),(12,13),
-#     (13,14),(15,17),(16,18),(14,21),(14,19),
-#     (19,20),(11,24),(11,22),(22,23),
-# 		(1,1)]
+num_nodes = 15
 
 directed_edges = [(1, 3), (3, 5), (2, 4), (4, 6),
                   (7, 9), (9, 11), (8, 10), (10, 12),
                   (13, 0), (13, 1), (13, 2), (13, 14),
                   (14, 8), (14, 7), (13, 13)]
 
-# directed_edges = [(i-1, j-1) for i, j in [
-# 	(1, 13), (1, 17), (2, 1), (3, 4), (5, 6),
-# 	(6, 7), (7, 8), (8, 22), (8, 23), (9, 10),
-# 	(10, 11), (11, 12), (12, 24), (12, 25), (13, 14),
-# 	(14, 15), (15, 16), (17, 18), (18, 19), (19, 20),
-# 	(21, 2), (21, 3), (21, 5), (21, 9),
-# 	(21, 21)    # Add self loop for Node 21 (the centre) to avoid singular matrices
-# ]]
-
-'''
-	change graph
-	revisar eso de calculo de aristas
-'''
 
 # Note: for now, let's not add self loops since the paper didn't mention this
 # self_loops = [(i, i) for i in range(num_nodes)]
@@ -162,19 +119,3 @@ class Graph:
 		# Incidence matrices
 		self.source_M, self.target_M = \
 			build_digraph_incidence_matrix(self.num_nodes, self.edges)
-
-
-# Check whether self loop should be added inside the graph
-# Check incidence matrix size
-
-
-# if __name__ == "__main__":
-# 	import matplotlib.pyplot as plt
-# 	graph = Graph()
-# 	source_M = graph.source_M
-# 	target_M = graph.target_M
-# 	plt.imshow(source_M, cmap='gray')
-# 	plt.show()
-# 	plt.imshow(target_M, cmap='gray')
-# 	plt.show()
-# 	print(source_M)
