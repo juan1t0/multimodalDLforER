@@ -1,3 +1,8 @@
+"""
+	The original implementation is in https://github.com/leoxiaobin/deep-high-resolution-net.pytorch
+	In our implementation, the use for several estimating people at the same time was eliminated
+"""
+
 import cv2
 import numpy as np
 import torch
@@ -144,38 +149,6 @@ class SimpleHRNet:
 
 		images = self.transform(cv2.cvtColor(image, cv2.COLOR_BGR2RGB)).unsqueeze(dim=0)
 		boxes = np.asarray([[0, 0, old_res[1], old_res[0]]], dtype=np.float32)  # [x1, y1, x2, y2]
-
-		# else:
-		# 	detections = self.detector.predict_single(image)
-
-		# 	nof_people = len(detections) if detections is not None else 0
-		# 	boxes = np.empty((nof_people, 4), dtype=np.int32)
-		# 	images = torch.empty((nof_people, 3, self.resolution[0], self.resolution[1]))  # (height, width)
-
-		# 	if detections is not None:
-		# 		for i, (x1, y1, x2, y2, conf, cls_conf, cls_pred) in enumerate(detections):
-		# 			x1 = int(round(x1.item()))
-		# 			x2 = int(round(x2.item()))
-		# 			y1 = int(round(y1.item()))
-		# 			y2 = int(round(y2.item()))
-
-		# 			# Adapt detections to match HRNet input aspect ratio (as suggested by xtyDoge in issue #14)
-		# 			correction_factor = self.resolution[0] / self.resolution[1] * (x2 - x1) / (y2 - y1)
-		# 			if correction_factor > 1:
-		# 				# increase y side
-		# 				center = y1 + (y2 - y1) // 2
-		# 				length = int(round((y2 - y1) * correction_factor))
-		# 				y1 = max(0, center - length // 2)
-		# 				y2 = min(image.shape[0], center + length // 2)
-		# 			elif correction_factor < 1:
-		# 				# increase x side
-		# 				center = x1 + (x2 - x1) // 2
-		# 				length = int(round((x2 - x1) * 1 / correction_factor))
-		# 				x1 = max(0, center - length // 2)
-		# 				x2 = min(image.shape[1], center + length // 2)
-
-		# 			boxes[i] = [x1, y1, x2, y2]
-		# 			images[i] = self.transform(image[y1:y2, x1:x2, ::-1])
 
 		if images.shape[0] > 0:
 			images = images.to(self.device)

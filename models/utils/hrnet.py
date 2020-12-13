@@ -1,3 +1,7 @@
+"""
+    Here is the implementation of HRnet, taken from https://github.com/leoxiaobin/deep-high-resolution-net.pytorch
+"""
+
 
 import torch
 from torch import nn

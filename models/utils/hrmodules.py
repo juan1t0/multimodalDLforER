@@ -1,6 +1,9 @@
+"""
+    Here are the two modules used for HRnet, originally form https://github.com/leoxiaobin/deep-high-resolution-net.pytorch
+"""
+
 import torch
 from torch import nn
-
 
 class Bottleneck(nn.Module):
     expansion = 4
