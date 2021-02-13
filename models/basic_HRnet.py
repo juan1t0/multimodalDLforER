@@ -1,5 +1,5 @@
 """
-	The original implementation is in https://github.com/leoxiaobin/deep-high-resolution-net.pytorch
+	The original implementation is in https://github.com/stefanopini/simple-HRNet
 	In our implementation, the use for several estimating people at the same time was eliminated
 """
 
