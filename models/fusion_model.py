@@ -204,8 +204,8 @@ class MergeClass():
 
 	def forward(self, data):
 		availables = [1.0] *4
-		fb,_,mb = self.Modalities['body'].forward(data['body'])
-		fc,_,mc = self.Modalities['context'].forward(data['context'])
+		fb, _, mb = self.Modalities['body'].forward(data['body'])
+		fc, _, mc = self.Modalities['context'].forward(data['context'])
 		middle_out = [mb[3], mc[3]]
 		final_out = [fb, fc]
 		if data['face'].sum().item() != 0.0:

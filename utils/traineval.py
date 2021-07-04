@@ -199,13 +199,13 @@ def eval(Model, dataset, bsz=32, test_sampler=None, collate=None, epoch=0, modal
 	return mAP, predictions, labeles
 
 def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch,
-								tsampler, vsampler,
-								last_epoch, modal, device, debug_mode, tqdm, train_loss, train_map,
-								val_loss, val_map, maxacc, step2val, step2save, checkpointdir, model_name):
+			   tsampler, vsampler,
+			   last_epoch, modal, device, debug_mode, tqdm, train_loss, train_map,
+			   val_loss, val_map, maxacc, step2val, step2save, checkpointdir, model_name):
 	
 	tl, ta, vl, va = train(Model=Model, train_dataset=dataset_t, Loss=Loss, optimizer=optimizer,
-													val_dataset=dataset_v , bsz=bsz, collate=collate, train_sampler=tsampler,
-													val_sampler=vsampler,epoch=epoch, modal=modal,
+													val_dataset=dataset_v, bsz=bsz, collate=collate, train_sampler=tsampler,
+													val_sampler=vsampler, epoch=epoch, modal=modal,
 													device=device, debug_mode=debug_mode, tqdm=tqdm)
 	train_loss[epoch] = tl
 	train_map[epoch] = ta
@@ -229,3 +229,18 @@ def train_step(Model, dataset_t, dataset_v, bsz, Loss, optimizer, collate, epoch
 							lossval=tl,	accval=ta,
 							save_dir=checkpointdir, modelname=model_name, save_name='_last')
 	return maxacc
+
+
+def get_thresholds(cat_preds, cat_labels, saving=False):
+	n_cats = cat_labels.shape[0]
+	thresholds = np.zeros(n_cats, dtype=np.float32)
+	for i in range(n_cats):
+		p, r, t = precision_recall_curve(cat_labels[i, :], cat_preds[i, :])
+		# print(p,r,t)
+		for k in range(len(p)):
+			if p[k] == r[k]:
+				thresholds[i] = t[k]
+				break
+	if saving:
+		np.save('thresholds.npy', thresholds)
+	return thresholds

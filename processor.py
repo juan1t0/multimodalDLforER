@@ -1,284 +1,347 @@
-# Unfinished
-
 import os
-import time
+import argparse
 import numpy as np
-import yaml
-#import pickle
-#from collections import OrderedDict, defaultdict
+import json
+import cv2
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.autograd import Variable
-# from tqdm import tqdm
-from tensorboardX import SummaryWriter
-import shutil
-from torch.optim.lr_scheduler import MultiStepLR
-import random
-import inspect
-import torch.backends.cudnn as cudnn
-from torch.utils.data import DataLoader
+from torch.optim import Adam
+from torch.utils.data.sampler import WeightedRandomSampler
+from torchvision import transforms
 
-from utils.dataset import Emotic_MDB
-from models.scofmer import Model as SCOF_model
+from tqdm import tqdm
+import insightface
 
+from utils.dataset import Emotic_MultiDB, Rescale, RandomCrop, ToTensor, my_collate
+from utils.traineval import train_step, eval
+from utils.mat2py import get_skeleton_data
+from models.fusion_model import MergeClass
+from models.face_net import ShortVGG as VGG
+from models.context_net import resnet18 as ABN
+from models.skeleton_net import Model as DGCNN
+from models.YOLOv3 import YOLOv3
+from models.basic_HRnet import SimpleHRNet as HRnet
 
-def init_seed(_):
-	torch.cuda.manual_seed_all(1)
-	torch.manual_seed(1)
-	np.random.seed(1)
-	random.seed(1)
-	# torch.backends.cudnn.enabled = False
-	torch.backends.cudnn.deterministic = True
-	torch.backends.cudnn.benchmark = False
+original_cats = ['Affection', 'Anger', 'Annoyance', 'Anticipation', 'Aversion', 'Confidence', 'Disapproval',
+				'Disconnection', 'Disquietment', 'Doubt/Confusion', 'Embarrassment', 'Engagement', 'Esteem',
+				'Excitement', 'Fatigue', 'Fear', 'Happiness', 'Pain', 'Peace', 'Pleasure', 'Sadness', 'Sensitivity',
+				'Suffering', 'Surprise', 'Sympathy', 'Yearning']
 
-class Processor():
-	"""Processor for Skeleton-based Action Recgnition"""
-	def __init__(self, config):
-		self.Configuration = config
-		self.save_config()
+modal_dirs = ['context', 'face', 'person', 'posture-bones', 'posture-joints']
 
-		self.global_step = 0
-		self.load_model()
-		self.load_param_groups()    # Group parameters to apply different learning rules
-		self.load_optimizer()
-		self.load_data()
-		self.lr = config['base_lr']
-		self.best_acc = 0
-		self.best_acc_epoch = 0
+new_labels = {'len': 8, 'cat': {
+	'joy': ['Excitement', 'Happiness', 'Peace', 'Affection', 'Pleasure'],
+	'trust': ['Confidence', 'Esteem', 'Sympathy'],
+	'fear': ['Disquietment', 'Embarrassment', 'Fear'],
+	'surprice': ['Doubt/Confusion', 'Surprise'],
+	'sadness': ['Pain', 'Sadness', 'Sensitivity', 'Suffering'],
+	'disgust': ['Aversion', 'Disconnection', 'Fatigue', 'Yearning'],
+	'anger': ['Anger', 'Annoyance', 'Disapproval'],
+	'anticipation': ['Anticipation', 'Engagement']}
+			}
 
-	def load_data(self):
-		dict = self.Configuration['dataset']
-		self.data_loader = dict()
+unimodels_default = {
+	'facial': '',
+	'bodily': '',
+	'contextual': '',
+	'postural': ''}
 
-		if dict['mode'] == 'train':
-			dataset = Emotic_MDB(root_dir=dict['root_dir'],
-													 annotation_dir=dict['annotation_dir'],
-													 mode=dict['mode'],
-													 modals_names=dict['modals_names'],
-													 categories=dict['categories'],
-													 transform=dict['transform'])
-			self.data_loader['train'] = DataLoader(dataset=dataset,
-																						 batch_size=dict['batch_size'],
-																						 shuffle=True,
-																						 num_workers=dict['num_worker'],
-																						 drop_last=True,
-																						 worker_init_fn=init_seed)
-			
-			dataset = Emotic_MDB(root_dir=dict['root_dir'],
-													 annotation_dir=dict['annotation_dir'],
-													 mode= 'val',
-													 modals_names=dict['modals_names'],
-													 categories=dict['categories'],
-													 transform=dict['transform'])
-			self.data_loader['val'] = DataLoader(dataset=dataset,
-																						 batch_size=dict['batch_size'],
-																						 shuffle=True,
-																						 num_workers=dict['num_worker'],
-																						 drop_last=True,
-																						 worker_init_fn=init_seed)
-			
-		dataset = Emotic_MDB(root_dir=dict['root_dir'],
-													 annotation_dir=dict['annotation_dir'],
-													 mode='test',
-													 modals_names=dict['modals_names'],
-													 categories=dict['categories'],
-													 transform=dict['transform'])
-		self.data_loader['test'] = DataLoader(dataset=dataset,
-																					batch_size=dict['batch_size'],
-																					shuffle=False,
-																					num_workers=dict['num_worker'],
-																					drop_last=False,
-																					worker_init_fn=init_seed)
-
-	def load_model(self):
-		dict = self.Configuration['model']
-		self.output_device = dict['device']
+def get_weighted_random_sampler(root_dir='Emotic_MultiDB', annotation_dir='Annotations', mode='train',
+								modality='label', takeone=True, modals_dirs=modal_dirs, categories=original_cats,
+								relabel=True, new_labeles=new_labels):
+	dataset = Emotic_MultiDB(root_dir, annotation_dir, mode, modality, takeone, modals_dirs, categories)
+	if relabel:
+		dataset.relabeled(new_labels)
 	
-		Model = SCOF_model(n_classes=dict['n_classes'],
-											 inner_models_config=dict['inner_models_config'],
-											 beta=dict['beta'],
-											 weights=dict['weights'])
+	target = []
+	for i in range(len(dataset)):
+		try:
+			target += [np.argmax(dataset[i]['label'])]
+		except:
+			pass
+	target = np.asarray(target)
+	class_sample_count = np.unique(target, return_counts=True)[1]
+	weight = 1. / class_sample_count
+	samples_weight = weight[target]
+	
+	samples_weight = torch.from_numpy(samples_weight).double()
+	sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
+	return sampler
 
-		self.Model = Model.cuda(self.output_device)
-		self.loss = nn.CrossEntropyLoss().cuda(self.output_device) ###### review
+def extract_data(ori_img, bbox, pose_model, fa_model):
+	if len(bbox) == 0:
+		return None
+	context = ori_img.copy()
+	body = context[bbox[1]:bbox[3],bbox[0]:bbox[2]].copy()
+	cn = body.shape
 
-		# Load weights
-		if dict['checkpoint']:
-			self.global_step = int(dict['global_step'])  #int(arg.weights[:-3].split('-')[-1])
-			
-			weights = torch.load(dict['weights_dir'])
-			# weights = OrderedDict([[k.split('module.')[-1],
-			# 											v.cuda(output_device)] for k, v in weights.items()])
-			#
-			# for w in dict['ignore_weights']:
-			# 	if weights.pop(w, None) is not None:
-			# 		self.print_log('Sucessfully Remove Weights: {}.'.format(w))
-			# 	else:
-			# 		self.print_log('Can Not Remove Weights: {}.'.format(w))
-			try:
-				self.model.load_state_dict(weights)
-			except:
-				state = self.model.state_dict()
-				diff = list(set(state.keys()).difference(set(weights.keys())))
-				print('Can not find these weights:')
-				for d in diff:
-					print('  ' + d)
-				state.update(weights)
-				self.model.load_state_dict(state)
+	pose = pose_model.predict(body)
 
-		# Parallelise data if mulitple GPUs
-		# if type(self.output_device) is list and len(self.output_device) > 1:
-		# 	self.model = nn.DataParallel(self.Model,
-		# 															 device_ids=self.output_device,
-		# 															 output_device=output_device)
+	body = cv2.resize(body,(256,256))
+	fbbox, _ = fa_model.detect(body,threshold=0.5, scale=1.0)
+	if len(fbbox) != 0:
+		fbbox = np.round(fbbox[0]).astype('int32')
+		face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
+		body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]] = np.zeros(face.shape)
+	else:
+		face = None
 
-	### no yet
-	def load_optimizer(self):
-			p_groups = list(self.optim_param_groups.values())
-			if self.arg.optimizer == 'SGD':
-					self.optimizer = optim.SGD(
-							p_groups,
-							lr=self.arg.base_lr,
-							momentum=0.9,
-							nesterov=self.arg.nesterov,
-							weight_decay=self.arg.weight_decay)
-			elif self.arg.optimizer == 'Adam':
-					self.optimizer = optim.Adam(
-							p_groups,
-							lr=self.arg.base_lr,
-							weight_decay=self.arg.weight_decay)
-			else:
-					raise ValueError('Unsupported optimizer: {}'.format(self.arg.optimizer))
+	context[bbox[1]:bbox[3],bbox[0]:bbox[2]] = np.zeros(cn)
+	joints, bones = get_skeleton_data(pose[0])
+	
+	return (context, body, face, joints, bones)
 
-			self.lr_scheduler = MultiStepLR(self.optimizer, milestones=self.arg.step, gamma=0.1)
-
-	def save_config(self):
-			# save arg
-			dict = vars(self.Configuration)
-			if not os.path.exists(dict['work_dir']):
-					os.makedirs(dict['work_dir'])
-			with open('{}/config.yaml'.format(dict['work_dir']), 'w') as f:
-					yaml.dump(dict, f)
-
-	# def print_time(self):
-	# 		localtime = time.asctime(time.localtime(time.time()))
-	# 		self.print_log("Local current time :  " + localtime)
-
-	def record_time(self):
-			self.cur_time = time.time()
-			return self.cur_time
-
-	def split_time(self):
-			split_time = time.time() - self.cur_time
-			self.record_time()
-			return split_time
-
-	def train(self, epoch, save_model=False):
-		print('Training epoch: {}'.format(epoch + 1))
-		self.Model.train()
-		loader = self.data_loader['train']
-		loss_values, acc_values = [], []
-
-		for batch_idx, batch_sample in enumerate(loader):
-			self.global_step += 1
-			# get data
-			with torch.no_grad():
-				joint_data = joint_data.float().cuda(self.output_device)
-				bone_data = bone_data.float().cuda(self.output_device)
-				label = label.long().cuda(self.output_device)
-			# timer['dataloader'] += self.split_time()
-
-			self.optimizer.zero_grad()
-			output = self.model(batch_sample)
-			loss = self.loss(output, batch_sample['label'])
-
-			loss.backward()
-			self.optimizer.step()
-
-			loss_values.append(loss.item())
-
-			value, predict_label = torch.max(output, 1)
-			acc_values.append(torch.mean((predict_label == label).float()))
-
-			self.optimizer.step()
-
-			# statistics
-			self.lr = self.optimizer.param_groups[0]['lr']
-			# self.train_writer.add_scalar('lr', self.lr, self.global_step)
-			# timer['statistics'] += self.split_time()
-
-		print ('\tMean training loss: {:.4f} ; epoch {}'.format(np.mean(loss_values),epoch))
-		print ('\tMean training acc: {:.4f} ; epoch {}'.format(np.mean(acc_values), epoch))
-
-		self.lr_scheduler.step(epoch)
-
-		if save_model:
-			weights = self.model.state_dict()
-			# weights = OrderedDict([[k.split('module.')[-1], v.cpu()] for k, v in weights.items()])
-			self.model_saved_name = self.Configuration['model_saved_name'] +'_'+ str(epoch) +'_'+ str(int(self.global_step)) + '.pt'
-			torch.save(weights, self.model_saved_name)
-
-	def eval(self, epoch, save_score=False, loader_name=['test']):
-		self.Model.eval()
-
-		for ln in loader_name:
-			loss_values, score_batches = [], []
-			step = 0
-			# process = tqdm(self.data_loader[ln])
-			for batch_idx, (joint_data, bone_data, label, index) in enumerate(data_loader[ln]):
-				step += 1
-				with torch.no_grad():
-					joint_data = joint_data.float().cuda(self.output_device)
-					bone_data = bone_data.float().cuda(self.output_device)
-					label = label.long().cuda(self.output_device)
-					output = self.model(joint_data, bone_data)
-
-					loss = self.loss(output, label)
-					score_batches.append(output.cpu().numpy())
-					loss_values.append(loss.item())
-					# Argmax over logits = labels
-					_, predict_label = torch.max(output, dim=1)
-
-			# Concatenate along the batch dimension, and 1st dim ~= `len(dataset)`
-			score = np.concatenate(score_batches)
-			loss = np.mean(loss_values)
-			accuracy = self.data_loader[ln].dataset.top_k(score, 1)
-			if accuracy > self.best_acc:
-				self.best_acc = accuracy
-				self.best_acc_epoch = epoch
-
-			print('Accuracy: ', accuracy, ' Model: ', self.arg.model_saved_name)
-
-			if save_score:
-				score_dict = dict(zip(self.data_loader[ln].dataset.sample_name, score))
-				with open('{}/epoch{}_{}_score.pkl'.format(self.arg.work_dir, epoch + 1, ln), 'wb') as f:
-					pickle.dump(score_dict, f)
-
-	def start(self):
+class Processor:
+	def __init__(self, args):
+		self.Arguments = args
+		if self.Arguments.cuda < 0:
+			self.device = torch.device('cpu')
+		elif self.Arguments.cuda == 0:
+			self.device = torch.device('cuda')
+		else:
+			self.device = torch.device('cuda:' + str(self.Arguments.cuda))  # chek it works
 		
-		if self.Configuration['mode'] == 'train':
-			dict = self.Configuration['train']
-			self.global_step = dict['start_epoch'] * len(self.data_loader['train']) / dict['batch_size']
+		if not os.path.exists('./checkpoints'):
+			os.mkdir('checkpoints')
+		
+		self.mode = None
+		self.dataset_root = None
+		self.multimodal, self.modality = None, None
+		self.test_db, self.train_db, self.val_db = None, None, None
+		self.Model = None
+		self.criterion, self.optimiser = None, None
+		self.epoch, self.last_epoch, self.batch_size = 0, 36, 16
+		self.train_acc, self.val_acc, self.train_loss, self.val_loss = None, None, None, None
+		self.train_sampler, self.val_sampler = None, None
+		self.model_saved_name, self.saving_step = self.Arguments.savename, 4
+		
+		self.my_collate = my_collate
+		self.load_data()
+		self.load_model()
+	
+	def load_data(self):
+		self.mode = self.Arguments.mode
+		self.dataset_root = self.Arguments.dataset
+		if self.Arguments.unimodal:
+			self.multimodal = False
+			self.modality = self.Arguments.modality
+		else:
+			self.multimodal = True
+			self.modality = 'all'
+		
+		if self.mode == "test":
+			self.test_db = Emotic_MultiDB(root_dir=self.dataset_root,
+										annotation_dir='Annotations',
+										mode='test',
+										modality=self.modality,
+										modals_dirs=modal_dirs,
+										categories=original_cats,
+										transform=transforms.Compose([Rescale(224, 224, 48),
+																		ToTensor()])
+										)
+			self.test_db.relabeled(new_labels)
+		else:
+			self.train_db = Emotic_MultiDB(root_dir=self.dataset_root,
+										annotation_dir='Annotations',
+										mode='train',
+										modality=self.modality,
+										modals_dirs=modal_dirs,
+										categories=original_cats,
+										transform=transforms.Compose([Rescale(256, 256, 56),
+																		RandomCrop(224, 224, 48),
+																		ToTensor()])
+										)
+			self.train_db.relabeled(new_labels)
+			self.val_db = Emotic_MultiDB(root_dir=self.dataset_root,
+										annotation_dir='Annotations',
+										mode='val',
+										modality=self.modality,
+										modals_dirs=modal_dirs,
+										categories=original_cats,
+										transform=transforms.Compose([Rescale(256, 256, 56),
+																	RandomCrop(224, 224, 48),
+																	ToTensor()])
+										)
+			self.val_db.relabeled(new_labels)
+		
+		if self.Arguments.oversample:
+			self.train_sampler = get_weighted_random_sampler(root_dir=self.dataset_root, annotation_dir='Annotations')
+			self.val_sampler = get_weighted_random_sampler(root_dir=self.dataset_root, annotation_dir='Annotations',
+														mode='val')
+	
+	def load_model(self):
+		if self.multimodal:
+			with open(self.Arguments.configuration) as jf:
+				model_configuration = json.load(jf)
+			model_configuration = self.change_device(model_configuration)
+			
+			loaded = torch.load(self.Arguments.unimodels + unimodels_default['facial'])
+			face_model = VGG('VGG19', 8).to(self.device)
+			face_model.load_state_dict(loaded['model_state_dict'])
+			
+			loaded = torch.load(self.Arguments.unimodels + unimodels_default['bodily'])
+			body_model = ABN(num_classes=8)
+			body_model = body_model.to(self.device)
+			body_model.load_state_dict(loaded['model_state_dict'])
+			
+			loaded = torch.load(self.Arguments.unimodels + unimodels_default['contextual'])
+			context_model = ABN(num_classes=8)
+			context_model = context_model.to(self.device)
+			context_model.load_state_dict(loaded['model_state_dict'])
+			
+			loaded = torch.load(self.Arguments.unimodels + unimodels_default['postural'])
+			pose_model = DGCNN().to(self.device)
+			pose_model.load_state_dict(loaded['model_state_dict'])
+			del loaded
+			
+			uni_models = {
+				'body': body_model.eval(),
+				'context': context_model.eval(),
+				'face': face_model.eval(),
+				'pose': pose_model.eval()
+			}
+			self.Model = MergeClass(uni_models, model_configuration, self.device)
+		else:
+			if self.Arguments.configuration:
+				model_configuration = json.load(self.Arguments.configuration)
+				model_configuration = self.change_device(model_configuration)
+				
+				if self.modality == 'face':
+					try:
+						self.Model = VGG(**model_configuration)
+					except:
+						print("Error to instantiate model configuration, default configuration is used instead.")
+						self.Model = VGG('VGG19', 8)
+				elif self.modality == 'body' or self.modality == 'context':
+					try:
+						self.Model = ABN(**model_configuration)
+					except:
+						print("Error to instantiate model configuration, default configuration is used instead.")
+						self.Model = ABN(num_classes=8)
+				elif self.modality == 'pose':
+					try:
+						self.Model = DGCNN(**model_configuration)
+					except:
+						print("Error to instantiate model configuration, default configuration is used instead.")
+						self.Model = DGCNN()
+			else:
+				raise Exception("A model configuration isn't defined")
+		
+		self.criterion = nn.BCEWithLogitsLoss()
+		self.optimiser = Adam(self.Model.parameters(), lr=0.001, weight_decay=5e-4)
+		
+		if self.Arguments.pretrained:
+			loaded = torch.load(self.Arguments.multimodel)
+			self.Model.load_state_dict(loaded['model_state_dict'])
+			self.optimiser.load_state_dict(loaded['optimizer_state_dict'])
+			self.epoch = loaded['epoch']
+			self.train_acc = loaded['train_acc']
+			self.val_acc = loaded['val_acc']
+			self.train_loss = loaded['train_loss']
+			self.val_loss = loaded['val_loss']
+			del loaded
+	
+	def change_device(self, config):
+		for k in config:
+			if isinstance(config[k], dict):
+				config[k] = self.change_device(config[k])
+			if k == "device":
+				config[k] = self.device
+		return config
+	
+	def get_data_modalities(self, image, use_tiny_yolo=False):
+		yolo_class_path="checkpoints/YOLO/coco.names"
+		if use_tiny_yolo:
+			yolo_model_def ="checkpoints/YOLO/yolov3-tiny.cfg"
+			yolo_weights_path="checkpoints/YOLO/YOLO-weights/yolov3-tiny.weights"
+		else:
+			yolo_model_def="checkpoints/YOLO/yolov3.cfg"
+			yolo_weights_path="checkpoints/YOLO/YOLO-weights/yolov3.weights"
+		detector = YOLOv3(model_def=yolo_model_def, class_path=yolo_class_path,
+					weights_path=yolo_weights_path, classes=('person',),
+					max_batch_size=16, device=self.device)
+		detections = detector.predict_single(image)
 
-			for epoch in range(dict['start_epoch'], dict['num_epoch']):
-				if self.lr < 1e-3:
-					break
-				save_model = ((epoch + 1) % dict['save_interval'] == 0) or (epoch + 1 == dict['num_epoch'])
+		fa_model = insightface.model_zoo.get_model('retinaface_r50_v1')
+		fa_model.prepare(ctx_id = 0, nms=0.4)
+		cpw48_dir = 'checkpoints/hrnet_w48_384x288.pth'
+		pose_model = HRnet(48, 17, cpw48_dir, multiperson=False, max_batch_size=2)
 
-				self.train(epoch, save_model=save_model)
-				self.eval(epoch, save_score=dict['save_score'], loader_name=['val'])
+		all_data = []
+		for i,(x1, y1, x2, y2, conf, cls_conf, cls_pred) in enumerate(detections):
+			x1, x2 = int(round(x1.item())), int(round(x2.item()))
+			y1, y2 = int(round(y1.item())), int(round(y2.item()))
+			bbox = [x1, y1, x2, y2]
+			data = extract_data(image, bbox, pose_model, fa_model)
+			name = self.Arguments.inputfile[:-4] +'_'+ str(i).zfill(3)
+			ctxnp = cv2.resize(data[0], (224,224))
+			bodnp = cv2.resize(data[1], (224,224))
+			if data[2] is None or len(data[2])==0:
+				facnp = np.zeros(16)
+			else:
+				facnp = cv2.resize(data[2], (48,48))
+			if data[3] is None or len(data[3])==0:
+				joinp = np.zeros(16)
+				bonnp = np.zeros(16)
+			else:
+				joinp = data[3]
+				bonnp = data[4]
+			all_data.append({'name': name,
+					'context': ctxnp,
+					'body': bodnp,
+					'face': facnp,
+					'joint':joinp,
+					'bone':bonnp})
+		return all_data
+	
+	def final_inference(self, image):
+		thresholds = np.load(self.Arguments.threshold)
+		emotions = new_labels['cat'].keys()
+		image_data = self.get_data_modalities(image)
+		for idx, sample in enumerate(image_data):
+			tdata = dict()
+			tdata['context'] = torch.from_numpy(sample['context'].transpose((2, 0, 1))).unsqueeze_(0).float().to(self.device)
+			tdata['body'] = torch.from_numpy(sample['body'].transpose((2, 0, 1))).unsqueeze_(0).float().to(self.device)
+			try:
+				tdata['face'] = torch.from_numpy(sample['face'].transpose((2, 0, 1))).unsqueeze_(0).float().to(self.device)
+				tdata['joint'] = torch.from_numpy(sample['joint']).unsqueeze_(0).float().to(self.device)
+				tdata['bone'] = torch.from_numpy(sample['bone']).unsqueeze_(0).float().to(self.device)
+			except:
+				tdata['face'] = torch.from_numpy(sample['face']).unsqueeze_(0).float().to(self.device)
+				tdata['joint'] = torch.from_numpy(sample['joint']).unsqueeze_(0).float().to(self.device)
+				tdata['bone'] = torch.from_numpy(sample['bone']).unsqueeze_(0).float().to(self.device)
+			prediction = self.Model.forward(tdata)
+			prediction = np.greater(prediction.detach().numpy(), thresholds)
+			write_line = ""
+			write_line += sample['name'] + ': '
+			for emotion, pred in zip(emotions,prediction):
+				write_line += emotion + ':' + str(pred) +', '
+			with open('results', 'a') as f:
+				f.writelines(write_line)
+				f.writelines('\n')
+		print('Inference concluded ...')
+	
+	def start(self):
+		if self.mode == 'train':
+			c_maxacc = 0
+			for epoch in range(self.epoch, self.epoch):
+				c_maxacc = train_step(Model=self.Model, dataset_t=self.train_db, dataset_v=self.val_db,
+									bsz=self.batch_size, Loss=self.criterion, optimizer=self.optimiser,
+									collate=self.my_collate, epoch=epoch, tsampler=self.train_sampler,
+									vsampler=self.val_sampler, last_epoch=self.last_epoch, modal=self.modality,
+									device=self.device, debug_mode=False, tqdm=tqdm, train_loss=list,
+									train_map=list, val_loss=list, val_map=list, maxacc=c_maxacc,
+									step2save=self.saving_step, checkpointdir='', model_name=self.model_saved_name)
+		
+		elif self.mode == 'test':
+			mAP = eval(Model=self.Model, dataset=self.test_db, bsz=self.batch_size, collate=self.my_collate,
+					epoch=0, modal=self.modality, device=self.device, tqdm=tqdm)
+			print('The mean AP is', mAP)
 
-			print('Best accuracy: {}, epoch: {}, model_name: {}'\
-				.format(self.best_acc, self.best_acc_epoch, self.model_saved_name))
-
-		elif self.Configuration['mode'] == 'test':
-			dict = self.Configuration['test']
-			if dict['weights_dir'] is None:
-				raise ValueError('Please provide weights')
-
-			self.eval(epoch=0, save_score=dict['save_score'], loader_name=['test'])
+		elif self.mode == 'inference':
+			input = cv2.imread(self.Arguments.inputfile)
+			inference = self.final_inference(input)
 			
 
 def str2bool(v):
@@ -289,24 +352,25 @@ def str2bool(v):
 	else:
 		raise Exception('Boolean value expected.')
 
-# def import_class(name):
-# 	components = name.split('.')
-# 	mod = __import__(components[0])  # import return model
-# 	for comp in components[1:]:
-# 			mod = getattr(mod, comp)
-# 	return mod
 
-# if p.config is not None:
-#   with open(p.config, 'r') as f:
-#     default_arg = yaml.load(f)
-#   key = vars(p).keys()
-#   for k in default_arg.keys():
-#     if k not in key:
-#       print('WRONG ARG: {}'.format(k))
-#       assert (k in key)
-#   parser.set_defaults(**default_arg)
-
-# arg = parser.parse_args()
-# init_seed(0)
-# processor = Processor(arg)
-# processor.start()
+if __name__ == "__main__":
+	parser = argparse.ArgumentParser()
+	parser.add_argument("-u", "--unimodal", action="store_true", help="specify the kind of running")
+	parser.add_argument("-t", "--modality", type=str, help="if unimodal, specify the modality")
+	parser.add_argument("-p", "--pretrained", action="store_true", help="pre trained models will be used")
+	parser.add_argument("-n", "--unimodel", type=str, help="if unimodal and pretrain, give the model path")
+	parser.add_argument("-u", "--unimodels", type=str, help="if multimodal and pretrain, give the models folder path")
+	parser.add_argument("-m", "--multimodel", type=str, help="if multimodal and pretrain, give the multimodel path")
+	parser.add_argument("-o", "--mode", type=str, help="specify if it is train of test")
+	parser.add_argument("-d", "--dataset", type=str, help="folder of the dataset")
+	parser.add_argument("-c", "--configuration", type=str, help="filename with the model config")
+	parser.add_argument("-g", "--cuda", type=int, help="id of the cuda device, -1 if it no use", default=-1)
+	parser.add_argument("-s", "--savename", type=str, help="name to save into checkpoints folder")
+	parser.add_argument("-v", "--oversample", action="store_true", help="if oversample will be used")
+	parser.add_argument("-i", "--inputfile", type=str, help="input image path for inference")
+	parser.add_argument("-h", "--threshold", type=str, help="thresholds npy file path for inference") 
+	
+	arg = parser.parse_args()
+	
+	processor = Processor(arg)
+	processor.start()
