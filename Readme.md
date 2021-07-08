@@ -30,6 +30,7 @@ The used data are shared [here](https://drive.google.com/file/d/1JAGejLFaymrIsq4
 This dataset is acquire form the original [EMOTIC dataset](http://sunai.uoc.edu/emotic/download.html).
 
 Moreover, the number of annotated emotions in EMOTIC (26) were reduced by grouping, following the taxonomy of Mr. Plutchik, into eight groups.
+
 <img src="figures/grouping.png" alt="data grouping" width="600"/>
 
 The weighted random sampler from pytorch was used in training time trying to solve the unbalancing of the EMOTIC dataset.
@@ -44,38 +45,38 @@ The weighted random sampler from pytorch was used in training time trying to sol
 The file tree must look like this:
 
 ```
-  multimodalDLforER\
-  |-checkpoints\
-  | |-models\
-  | | |-bodyabn_last.pth\
-  | | |-contextabn_best.pth\
-  | | |-facevgg_best.pth\
-  | | \\-posedgcnn_ws_last.pth\
-  | |-checkpoints\
-  | | \\...\
-  | |-thresholds\
-  | | |-thresholds_validation.npy\
-  | | \\...\
-  | |-YOLO\
-  | | |-YOLO-weights\
-  | | | \\...\
-  | | |-coco.names\
-  | | \\...\
-  | \\...\
-  | |-hrnet_w48_384x288.pth\
-  | \\...\
-  |-configs\
-  | |-embracenet_plus.json\
-  | \\...\
-  |-EMOTIC\
-  | \\...\
-  |-models\
-  | |-utils\
-  | | \\..\
-  | \\...\
-  |-utils\
-  | \\...\
-  \\-processor.py\
+  multimodalDLforER
+  |-checkpoints
+  | |-models
+  | | |-bodyabn_last.pth
+  | | |-contextabn_best.pth
+  | | |-facevgg_best.pth
+  | | \\-posedgcnn_ws_last.pth
+  | |-checkpoints
+  | | \\...
+  | |-thresholds
+  | | |-thresholds_validation.npy
+  | | \\...
+  | |-YOLO
+  | | |-YOLO-weights
+  | | | \\...
+  | | |-coco.names
+  | | \\...
+  | \\...
+  | |-hrnet_w48_384x288.pth
+  | \\...
+  |-configs
+  | |-embracenet_plus.json
+  | \\...
+  |-EMOTIC
+  | \\...
+  |-models
+  | |-utils
+  | | \\..
+  | \\...
+  |-utils
+  | \\...
+  \\-processor.py
 ```
  
 #### Training
