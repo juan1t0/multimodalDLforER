@@ -91,6 +91,18 @@ The file tree must look like this:
 ```bash
   python processor.py -p -l checkpoints/models/ -m checkpoints/checkpoints/ebnplus -o inference -c configs/embracenet_plus.json -g 0 -i img.png -h checkpoints/thresholds/thresholds_validation.npy
 ```
+## Citation
+If you use our code or models in your research, please cite with:
+```
+@inproceedings{heredia2021multi,
+  title={A Multi-modal Visual Emotion Recognition Method to Instantiate an Ontology},
+  author={Heredia, Juan and Cardinale, Yudith and Dongo, Irvin and D{\'\i}az-Amado, Jose},
+  booktitle={16th International Conference on Software Technologies},
+  pages={453--464},
+  year={2021},
+  organization={SCITEPRESS-Science and Technology Publications}
+}
+```
 
 ## Acknowledgments
 This research was supported by the FONDO NACIONAL DEDESARROLLO CIENTÍFICO, TECNOLÓGICO Y DE INNOVACIÓN TECNOLÓGICA - FONDECYT as executing entity of CONCYTEC under grant agreement no.01-2019-FONDECYT-BM-INC.INV in the project RUTAS: Robots for Urban Tourism,Autonomous and Semantic web based.
