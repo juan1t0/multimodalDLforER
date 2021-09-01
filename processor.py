@@ -11,7 +11,8 @@ from torch.utils.data.sampler import WeightedRandomSampler
 from torchvision import transforms
 
 from tqdm import tqdm
-import insightface
+from deepface import DeepFace
+from deepface.detectors.RetinaFaceWrapper import build_model, detect_face
 
 from utils.dataset import Emotic_MultiDB, Rescale, RandomCrop, ToTensor, my_collate
 from utils.traineval import train_step, eval
@@ -79,11 +80,25 @@ def extract_data(ori_img, bbox, pose_model, fa_model):
 	pose = pose_model.predict(body)
 
 	body = cv2.resize(body,(256,256))
-	fbbox, _ = fa_model.detect(body,threshold=0.5, scale=1.0)
-	if len(fbbox) != 0:
-		fbbox = np.round(fbbox[0]).astype('int32')
-		face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
-		body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]] = np.zeros(face.shape)
+	faces = detect_face(fa_model, body, align=False)
+
+	# fbbox, _ = fa_model.detect(body,threshold=0.5, scale=1.0) # v0
+	# face, freg = DeepFace.functions.detect_face(body, detector_backend='retinaface', align=False) v2
+	
+	# if len(fbbox) != 0: # v0
+	# 	fbbox = np.round(fbbox[0]).astype('int32')
+	# 	face = body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]].copy()
+	# 	body[fbbox[1]:fbbox[3],fbbox[0]:fbbox[2]] = np.zeros(face.shape)
+	# else:
+	# 	face = None
+	# if face not is None: #v2
+	# 	fbbox = [rfeg[0],rfeg[0]+rfeg[2],rfeg[1],rfeg[1]+rfeg[3]]
+	# 	body[fbbox[2]:fbbox[3],fbbox[0]:fbbox[1]] = np.zeros(face.shape)
+
+	if len(faces) > 0:
+		face, freg = faces[0][0], faces[0][1] # taking just the top(0) detected face
+		fbbox = [rfeg[0],rfeg[0]+rfeg[2],rfeg[1],rfeg[1]+rfeg[3]]
+		body[fbbox[2]:fbbox[3],fbbox[0]:fbbox[1]] = np.zeros(face.shape)
 	else:
 		face = None
 
@@ -263,8 +278,9 @@ class Processor:
 					max_batch_size=16, device=self.device)
 		detections = detector.predict_single(image)
 
-		fa_model = insightface.model_zoo.get_model('retinaface_r50_v1')
-		fa_model.prepare(ctx_id = 0, nms=0.4)
+		# fa_model = insightface.model_zoo.get_model('retinaface_r50_v1')
+		# fa_model.prepare(ctx_id = 0, nms=0.4)
+		fa_model = build_model()
 		cpw48_dir = 'checkpoints/hrnet_w48_384x288.pth'
 		pose_model = HRnet(48, 17, cpw48_dir, multiperson=False, max_batch_size=2)
 
