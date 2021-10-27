@@ -92,12 +92,12 @@ def extract_data(ori_img, bbox, pose_model, fa_model):
 	# else:
 	# 	face = None
 	# if face not is None: #v2
-	# 	fbbox = [rfeg[0],rfeg[0]+rfeg[2],rfeg[1],rfeg[1]+rfeg[3]]
+	# 	fbbox = [freg[0],freg[0]+freg[2],freg[1],freg[1]+freg[3]]
 	# 	body[fbbox[2]:fbbox[3],fbbox[0]:fbbox[1]] = np.zeros(face.shape)
 
 	if len(faces) > 0:
 		face, freg = faces[0][0], faces[0][1] # taking just the top(0) detected face
-		fbbox = [rfeg[0],rfeg[0]+rfeg[2],rfeg[1],rfeg[1]+rfeg[3]]
+		fbbox = [freg[0],freg[0]+freg[2],freg[1],freg[1]+freg[3]]
 		body[fbbox[2]:fbbox[3],fbbox[0]:fbbox[1]] = np.zeros(face.shape)
 	else:
 		face = None
@@ -327,8 +327,8 @@ class Processor:
 				tdata['face'] = torch.from_numpy(sample['face']).unsqueeze_(0).float().to(self.device)
 				tdata['joint'] = torch.from_numpy(sample['joint']).unsqueeze_(0).float().to(self.device)
 				tdata['bone'] = torch.from_numpy(sample['bone']).unsqueeze_(0).float().to(self.device)
-			prediction = self.Model.forward(tdata)
-			prediction = np.greater(prediction.detach().numpy(), thresholds)
+			prediction, _ = self.Model.forward(tdata)
+			prediction = np.greater(prediction.detach().cpu().numpy(), thresholds)
 			write_line = ""
 			write_line += sample['name'] + ': '
 			for emotion, pred in zip(emotions,prediction):
