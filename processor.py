@@ -43,10 +43,10 @@ new_labels = {'len': 8, 'cat': {
 			}
 
 unimodels_default = {
-	'facial': '',
-	'bodily': '',
-	'contextual': '',
-	'postural': ''}
+	'facial': 'face_vgg.pth',
+	'bodily': 'body_abn.pth',
+	'contextual': 'context_abn.pth',
+	'postural': 'pose_dgcnn.pth'}
 
 def get_weighted_random_sampler(root_dir='Emotic_MultiDB', annotation_dir='Annotations', mode='train',
 								modality='label', takeone=True, modals_dirs=modal_dirs, categories=original_cats,
@@ -145,7 +145,9 @@ class Processor:
 			self.multimodal = True
 			self.modality = 'all'
 		
-		if self.mode == "test":
+		if self.mode == "inference":
+			return
+		elif self.mode == "test":
 			self.test_db = Emotic_MultiDB(root_dir=self.dataset_root,
 										annotation_dir='Annotations',
 										mode='test',
@@ -314,6 +316,8 @@ class Processor:
 	def final_inference(self, image):
 		thresholds = np.load(self.Arguments.threshold)
 		emotions = new_labels['cat'].keys()
+		if os.path.exists('results'):
+			os.remove('results')
 		image_data = self.get_data_modalities(image)
 		for idx, sample in enumerate(image_data):
 			tdata = dict()
@@ -331,8 +335,9 @@ class Processor:
 			prediction = np.greater(prediction.detach().cpu().numpy(), thresholds)
 			write_line = ""
 			write_line += sample['name'] + ': '
-			for emotion, pred in zip(emotions,prediction):
-				write_line += emotion + ':' + str(pred) +', '
+			for emotion, pred in zip(emotions,prediction[0]):
+				if pred:
+					write_line += emotion + ', '#':' + str(pred) +', '
 			with open('results', 'a') as f:
 				f.writelines(write_line)
 				f.writelines('\n')
@@ -371,7 +376,7 @@ def str2bool(v):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-u", "--unimodal", action="store_true", help="specify the kind of running")
+	parser.add_argument("-a", "--unimodal", action="store_true", help="specify the kind of running")
 	parser.add_argument("-t", "--modality", type=str, help="if unimodal, specify the modality")
 	parser.add_argument("-p", "--pretrained", action="store_true", help="pre trained models will be used")
 	parser.add_argument("-n", "--unimodel", type=str, help="if unimodal and pretrain, give the model path")
@@ -384,7 +389,7 @@ if __name__ == "__main__":
 	parser.add_argument("-s", "--savename", type=str, help="name to save into checkpoints folder")
 	parser.add_argument("-v", "--oversample", action="store_true", help="if oversample will be used")
 	parser.add_argument("-i", "--inputfile", type=str, help="input image path for inference")
-	parser.add_argument("-h", "--threshold", type=str, help="thresholds npy file path for inference") 
+	parser.add_argument("-r", "--threshold", type=str, help="thresholds npy file path for inference") 
 	
 	arg = parser.parse_args()
 	

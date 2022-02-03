@@ -81,16 +81,20 @@ The file tree must look like this:
  
 #### Training
 ```bash
-  python processor.py -l checkpoints/models/ -o train -d EMOTIC/ -c configs/embracenet_plus.json -g 0 -s checkpoints/ebnplus -v
+  python processor.py -u checkpoints/models/ -o train -d EMOTIC/ -c configs/embracenet_plus.json -g 0 -s checkpoints/ebnplus -v
 ```
 #### Test
 ```bash
-  python processor.py -p -l checkpoints/models/ -m checkpoints/checkpoints/ebnplus -o test -d EMOTIC/ -c configs/embracenet_plus.json -g 0 
+  python processor.py -p -u checkpoints/models/ -m checkpoints/checkpoints/ebnplus/ebnp.pth -o test -d EMOTIC/ -c configs/embracenet_plus.json -g 0 
 ```
 #### Inference
 ```bash
-  python processor.py -p -l checkpoints/models/ -m checkpoints/checkpoints/ebnplus -o inference -c configs/embracenet_plus.json -g 0 -i img.png -h checkpoints/thresholds/thresholds_validation.npy
+  python processor.py -p -u checkpoints/models/ -m checkpoints/checkpoints/ebnplus/ebnp.pth -o inference -c configs/embracenet_plus.json -g 0 -i img.png -r checkpoints/thresholds/thresholds_validation.npy
 ```
+#### Help of arguments
+[-h] [-a UNIMODAL] [-t MODAlity] [-p PRETRAINED] [-n UNIMODEL] [-u UNIMODELS] [-m MULTIMODEL] [-o MODE] [-d DATASET] [-c CONFIGURATION] [-g CUDA] [-s SAVENAME] [-v OVERSAMPLE] [-i INPUTFILE] [-r THRESHOLD]
+
+
 ## Citation
 If you use our code or models in your research, please cite with:
 ```
